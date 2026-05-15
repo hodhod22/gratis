@@ -1,0 +1,8 @@
+# robots.txt
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+
+Sitemap: https://freewebdev.se/sitemap.xml

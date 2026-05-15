@@ -1,26 +1,289 @@
+/* app/globals.css - Tailwind CSS v4 */
+
+/* Importera Tailwind v4 */
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Definiera custom tema */
+@theme {
+  /* Custom färger */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-secondary-500: #8b5cf6;
+  --color-secondary-600: #7c3aed;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Animationer */
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.4s ease-out;
+  --animate-slide-down: slide-down 0.4s ease-out;
+  --animate-scale-in: scale-in 0.3s ease-out;
+  --animate-pulse-gentle: pulse-gentle 2s ease-in-out infinite;
+
+  /* Keyframes */
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes slide-up {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes slide-down {
+    0% { transform: translateY(-20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes scale-in {
+    0% { transform: scale(0.95); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes pulse-gentle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Dark mode - Tailwind v4 sätt */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Globala basstilar */
+@layer base {
+  * {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-duration: 200ms;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-image: linear-gradient(to bottom right, var(--color-slate-50), var(--color-slate-100));
+    color: var(--color-slate-900);
+  }
+
+  .dark body {
+    background-image: linear-gradient(to bottom right, var(--color-slate-950), var(--color-slate-900));
+    color: var(--color-slate-100);
+  }
+}
+
+/* Custom utilities */
+@utility text-gradient {
+  background-image: linear-gradient(135deg, var(--color-primary-500), var(--color-secondary-500));
+  background-clip: text;
+  color: transparent;
+}
+
+@utility glass {
+  background-color: rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgb(255 255 255 / 0.2);
+}
+
+@utility hover-lift {
+  transition-property: transform, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1);
+  }
+}
+
+@utility line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@utility line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background-color: var(--color-slate-100);
+  }
+
+  .dark &::-webkit-scrollbar-track {
+    background-color: var(--color-slate-800);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-slate-400);
+    border-radius: 9999px;
+  }
+
+  .dark &::-webkit-scrollbar-thumb {
+    background-color: var(--color-slate-600);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate-500);
+  }
+
+  .dark &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate-500);
+  }
+}
+
+/* Article styling for blog posts */
+@layer components {
+  .prose {
+    max-width: none;
+  }
+
+  .prose h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (width >= 768px) {
+    .prose h1 {
+      font-size: 2.25rem;
+    }
+  }
+
+  .prose h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  @media (width >= 768px) {
+    .prose h2 {
+      font-size: 1.875rem;
+    }
+  }
+
+  .prose h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  @media (width >= 768px) {
+    .prose h3 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .prose p {
+    margin-bottom: 1rem;
+    line-height: 1.625;
+  }
+
+  .prose a {
+    color: var(--color-primary-600);
+    text-decoration: underline;
+  }
+
+  .dark .prose a {
+    color: var(--color-primary-400);
+  }
+
+  .prose a:hover {
+    text-decoration: none;
+  }
+
+  .prose ul, .prose ol {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    margin-left: 1.5rem;
+  }
+
+  .prose li {
+    margin-bottom: 0.25rem;
+  }
+
+  .prose blockquote {
+    border-left-width: 4px;
+    border-left-color: var(--color-primary-500);
+    padding-left: 1rem;
+    font-style: italic;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    color: var(--color-slate-600);
+  }
+
+  .dark .prose blockquote {
+    color: var(--color-slate-400);
+  }
+
+  .prose code {
+    background-color: var(--color-slate-100);
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .dark .prose code {
+    background-color: var(--color-slate-800);
+  }
+
+  .prose pre {
+    background-color: var(--color-slate-900);
+    color: var(--color-slate-100);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .prose pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+  }
+}
+
+/* Animation utilities */
+@utility animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+@utility animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+@utility animate-slide-down {
+  animation: slide-down 0.4s ease-out;
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.3s ease-out;
+}
+
+@utility animate-pulse-gentle {
+  animation: pulse-gentle 2s ease-in-out infinite;
 }
