@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Doc } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 import {
   FiMail,
   FiCheck,
@@ -22,6 +22,10 @@ import {
   FiInbox,
   FiHeart,
   FiStar,
+  FiBarChart2,
+  FiAlertCircle,
+  FiCalendar,
+  FiFlag,
 } from "react-icons/fi";
 
 interface Conversation {
@@ -63,6 +67,13 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
   const [activeTab, setActiveTab] = useState<"active" | "closed" | "requests">(
     "active",
   );
+  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+  const [showRequestDetail, setShowRequestDetail] = useState(false);
+  const [requestProgress, setRequestProgress] = useState<{
+    [key: string]: number;
+  }>({});
+  const [notificationSound] = useState(true);
+  const [lastUnreadCount, setLastUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Hämta konversationer
@@ -85,7 +96,29 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
 
   // Mutationer för förfrågningar
   const updateRequestStatus = useMutation(api.admin.updateRequestStatus);
+  const updateRequestPriority = useMutation(api.admin.updateRequestPriority);
   const deleteRequest = useMutation(api.admin.deleteRequest);
+
+  // Admin status heartbeat - SIMPLIFIERAD
+  useEffect(() => {
+    // Sätt admin som online direkt via enklare metod
+    const updateStatus = async () => {
+      try {
+        await fetch("/api/admin-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isOnline: true }),
+        });
+      } catch (e) {
+        console.log("Status update failed");
+      }
+    };
+
+    updateStatus();
+    const interval = setInterval(updateStatus, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const conversations =
     activeTab === "active" ? activeConversations : closedConversations;
@@ -94,6 +127,92 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     0,
   );
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
+  const inProgressRequests = requests.filter(
+    (r) => r.status === "in-progress",
+  ).length;
+
+  // Admin heartbeat - bara om admin är inloggad
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch("/api/admin-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isOnline: true }),
+        });
+      } catch (error) {
+        console.error("Heartbeat failed:", error);
+      }
+    };
+
+    // Skicka direkt
+    sendHeartbeat();
+
+    // Skicka var 30e sekund
+    interval = setInterval(sendHeartbeat, 30000);
+
+    return () => {
+      clearInterval(interval);
+      // Sätt offline när admin-panelen stängs
+      fetch("/api/admin-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isOnline: false }),
+      }).catch(() => {});
+    };
+  }, []);
+
+  // Notis när nya meddelanden kommer
+  useEffect(() => {
+    if (totalUnread > lastUnreadCount && notificationSound) {
+      try {
+        const audioContext = new (
+          window.AudioContext || (window as any).webkitAudioContext
+        )();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 880;
+        gainNode.gain.value = 0.2;
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.00001,
+          audioContext.currentTime + 0.3,
+        );
+        oscillator.stop(audioContext.currentTime + 0.3);
+        setTimeout(() => audioContext.close(), 400);
+      } catch (e) {
+        console.log("Audio not supported");
+      }
+
+      if (totalUnread > 0) {
+        document.title = `(${totalUnread}) Admin Panel - FreeWebDev`;
+      } else {
+        document.title = "Admin Panel - FreeWebDev";
+      }
+    }
+    setLastUnreadCount(totalUnread);
+  }, [totalUnread, lastUnreadCount, notificationSound]);
+
+  // Simulera progress för pågående projekt
+  useEffect(() => {
+    const inProgressReqs = requests.filter((r) => r.status === "in-progress");
+    const newProgress: { [key: string]: number } = {};
+
+    inProgressReqs.forEach((req) => {
+      const saved = localStorage.getItem(`progress_${req._id}`);
+      if (saved) {
+        newProgress[req._id] = parseInt(saved);
+      } else {
+        newProgress[req._id] = Math.floor(Math.random() * 60) + 20;
+      }
+    });
+
+    setRequestProgress(newProgress);
+  }, [requests]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -143,7 +262,6 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     if (!selectedConversation) return;
     await closeConversation({ email: selectedConversation.email });
     setSelectedConversation(null);
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleSendReply = async (e: React.FormEvent) => {
@@ -165,20 +283,40 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     }
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = async (messageId: Id<"messages">) => {
     if (confirm("Är du säker på att du vill radera detta meddelande?")) {
-      await deleteMessage({ id: messageId as any });
+      await deleteMessage({ id: messageId });
     }
   };
 
   // Hantera förfrågningar
-  const handleUpdateStatus = async (id: string, status: string) => {
-    await updateRequestStatus({ id: id as any, status });
+  const handleUpdateStatus = async (id: Id<"requests">, status: string) => {
+    await updateRequestStatus({ id, status });
+    if (status === "in-progress") {
+      localStorage.setItem(`progress_${id}`, "25");
+      setRequestProgress((prev) => ({ ...prev, [id]: 25 }));
+    }
+    if (status === "completed") {
+      localStorage.removeItem(`progress_${id}`);
+    }
   };
 
-  const handleDeleteRequest = async (id: string) => {
+  const handleUpdatePriority = async (id: Id<"requests">, priority: number) => {
+    await updateRequestPriority({ id, priority });
+  };
+
+  const handleUpdateProgress = (id: string, progress: number) => {
+    setRequestProgress((prev) => ({ ...prev, [id]: progress }));
+    localStorage.setItem(`progress_${id}`, progress.toString());
+  };
+
+  const handleDeleteRequest = async (id: Id<"requests">) => {
     if (confirm("Är du säker på att du vill radera denna förfrågan?")) {
-      await deleteRequest({ id: id as any });
+      await deleteRequest({ id });
+      if (selectedRequest?._id === id) {
+        setSelectedRequest(null);
+        setShowRequestDetail(false);
+      }
     }
   };
 
@@ -197,20 +335,29 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     }
   };
 
-  const getPriorityStars = (priority: number) => {
-    return "⭐".repeat(priority);
+  const getPriorityColor = (priority: number) => {
+    if (priority >= 4) return "text-red-600";
+    if (priority >= 3) return "text-orange-600";
+    return "text-green-600";
+  };
+
+  const getProgressColor = (progress: number) => {
+    if (progress >= 75) return "bg-green-500";
+    if (progress >= 50) return "bg-blue-500";
+    if (progress >= 25) return "bg-yellow-500";
+    return "bg-red-500";
   };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
+      {/* Header med notiser */}
       <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Admin Panel
           </h1>
           <p className="text-slate-600 dark:text-slate-400 text-sm">
-            Hantera konversationer och förfrågningar
+            Hantera konversationer, förfrågningar och projekt
           </p>
           <p className="text-xs text-green-600 mt-1">
             ✅ Inloggad som admin: {adminEmail}
@@ -219,51 +366,53 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
 
         {/* Notification Badge */}
         {totalUnread > 0 && (
-          <div className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full animate-pulse">
-            <FiBell className="w-5 h-5" />
-            <span className="font-semibold">{totalUnread} nya meddelanden</span>
+          <div className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full animate-pulse shadow-lg">
+            <FiBell className="w-5 h-5 animate-bounce" />
+            <span className="font-semibold text-lg">
+              {totalUnread} nya meddelanden
+            </span>
           </div>
         )}
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <FiUsers className="w-8 h-8 text-blue-500" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-lg">
+          <div className="flex items-center gap-2">
+            <FiUsers className="w-5 h-5 text-blue-500" />
             <div>
-              <p className="text-2xl font-bold">{activeConversations.length}</p>
-              <p className="text-xs text-slate-500">Aktiva konversationer</p>
+              <p className="text-xl font-bold">{activeConversations.length}</p>
+              <p className="text-xs text-slate-500">Aktiva</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <FiArchive className="w-8 h-8 text-orange-500" />
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-lg">
+          <div className="flex items-center gap-2">
+            <FiArchive className="w-5 h-5 text-orange-500" />
             <div>
-              <p className="text-2xl font-bold">{closedConversations.length}</p>
-              <p className="text-xs text-slate-500">Stängda konversationer</p>
+              <p className="text-xl font-bold">{closedConversations.length}</p>
+              <p className="text-xs text-slate-500">Stängda</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <FiInbox className="w-8 h-8 text-purple-500" />
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-lg">
+          <div className="flex items-center gap-2">
+            <FiInbox className="w-5 h-5 text-purple-500" />
             <div>
-              <p className="text-2xl font-bold">{requests.length}</p>
-              <p className="text-xs text-slate-500">Totala förfrågningar</p>
+              <p className="text-xl font-bold">{requests.length}</p>
+              <p className="text-xs text-slate-500">Förfrågningar</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <FiHeart className="w-8 h-8 text-red-500" />
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-lg">
+          <div className="flex items-center gap-2">
+            <FiClock className="w-5 h-5 text-yellow-500" />
             <div>
-              <p className="text-2xl font-bold">{pendingRequests}</p>
-              <p className="text-xs text-slate-500">Väntande förfrågningar</p>
+              <p className="text-xl font-bold">{pendingRequests}</p>
+              <p className="text-xs text-slate-500">Väntande</p>
             </div>
           </div>
         </div>
@@ -282,8 +431,8 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
           <FiMessageSquare className="inline mr-2 w-4 h-4" />
           Aktiva ({activeConversations.length})
           {totalUnread > 0 && (
-            <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-              {totalUnread}
+            <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+              {totalUnread} nya
             </span>
           )}
         </button>
@@ -351,18 +500,22 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
                     className={`p-4 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-700 ${
                       selectedConversation?.email === conv.email
                         ? "bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500"
-                        : ""
+                        : conv.unreadCount > 0
+                          ? "bg-red-50 dark:bg-red-950/20 border-l-4 border-red-500"
+                          : ""
                     }`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="font-semibold truncate">
+                          <span
+                            className={`font-semibold truncate ${conv.unreadCount > 0 ? "text-red-600 dark:text-red-400" : ""}`}
+                          >
                             {conv.name}
                           </span>
                           {conv.unreadCount > 0 && (
-                            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
-                              {conv.unreadCount}
+                            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                              {conv.unreadCount} ny
                             </span>
                           )}
                         </div>
@@ -440,7 +593,7 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
                       {!msg.isFromAdmin && (
                         <button
                           onClick={() => handleDeleteMessage(msg._id)}
-                          className="ml-2 text-red-500"
+                          className="ml-2 text-red-500 opacity-0 hover:opacity-100 transition-opacity"
                         >
                           <FiTrash2 className="w-4 h-4" />
                         </button>
@@ -460,7 +613,7 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       placeholder="Skriv ditt svar..."
-                      className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
                       autoFocus
                     />
                     <button
@@ -487,95 +640,318 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
 
       {/* Förfrågningar */}
       {activeTab === "requests" && (
-        <div className="space-y-4">
-          {requests.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-12 text-center">
-              <FiInbox className="w-16 h-16 mx-auto mb-4 text-slate-400 opacity-50" />
-              <p className="text-slate-500">Inga förfrågningar ännu</p>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Requests List */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden flex flex-col h-150">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+              <h2 className="font-semibold flex items-center gap-2">
+                <FiHeart className="w-5 h-5" />
+                Förfrågningar om gratis hemsidor
+              </h2>
             </div>
-          ) : (
-            requests.map((req: Request) => (
-              <div
-                key={req._id}
-                className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg"
-              >
-                <div className="flex justify-between items-start flex-wrap gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h3 className="font-semibold text-lg">{req.name}</h3>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${getStatusColor(req.status)}`}
-                      >
-                        {req.status === "pending" && "Väntar"}
-                        {req.status === "in-progress" && "Påbörjad"}
-                        {req.status === "completed" && "Klar"}
-                        {req.status === "rejected" && "Avböjd"}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {getPriorityStars(req.priority)} Prioritet{" "}
-                        {req.priority}/5
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-500 mb-2">{req.email}</p>
-                    <p className="text-slate-600 dark:text-slate-400 mb-3">
-                      {req.description}
-                    </p>
-                    {req.requirements && (
-                      <p className="text-sm text-slate-500 mb-2">
-                        <strong>Krav:</strong> {req.requirements}
-                      </p>
-                    )}
-                    <div className="flex gap-2 mt-2">
-                      <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded-full">
-                        {req.websiteType}
-                      </span>
-                      <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900 rounded-full">
-                        {req.budget === "gratis"
-                          ? "Gratis"
-                          : req.budget === "donation"
-                            ? "Donation möjlig"
-                            : "Ingen budget"}
-                      </span>
-                      {req.deadline && (
-                        <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900 rounded-full">
-                          Deadline: {req.deadline}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-3 text-xs text-slate-400">
-                      Skickades:{" "}
-                      {new Date(req.createdAt).toLocaleDateString("sv-SE")}
-                    </div>
-                    {req.adminNotes && (
-                      <div className="mt-3 p-2 bg-slate-100 dark:bg-slate-700 rounded text-sm">
-                        <strong>Admin anteckning:</strong> {req.adminNotes}
+
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-700">
+              {requests.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  <FiInbox className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>Inga förfrågningar ännu</p>
+                </div>
+              ) : (
+                requests.map((req) => (
+                  <div
+                    key={req._id}
+                    onClick={() => {
+                      setSelectedRequest(req);
+                      setShowRequestDetail(true);
+                    }}
+                    className={`p-4 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                      selectedRequest?._id === req._id && showRequestDetail
+                        ? "bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-semibold truncate">
+                            {req.name}
+                          </span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(req.status)}`}
+                          >
+                            {req.status === "pending" && "Väntar"}
+                            {req.status === "in-progress" && "Pågår"}
+                            {req.status === "completed" && "Klar"}
+                            {req.status === "rejected" && "Avböjd"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-1 truncate">
+                          {req.email}
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                          {req.description}
+                        </p>
                       </div>
-                    )}
+                      <div className="flex flex-col items-end gap-1 ml-2">
+                        <span className="text-xs text-slate-400 flex items-center gap-1 whitespace-nowrap">
+                          <FiClock className="w-3 h-3" />
+                          {formatDate(req.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress bar for in-progress requests */}
+                    {req.status === "in-progress" &&
+                      requestProgress[req._id] && (
+                        <div className="mt-3">
+                          <div className="flex justify-between text-xs text-slate-500 mb-1">
+                            <span>Framsteg</span>
+                            <span>{requestProgress[req._id]}%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(requestProgress[req._id])}`}
+                              style={{ width: `${requestProgress[req._id]}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                   </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={req.status}
-                      onChange={(e) =>
-                        handleUpdateStatus(req._id, e.target.value)
-                      }
-                      className="text-sm border rounded-lg px-2 py-1 bg-white dark:bg-slate-900"
-                    >
-                      <option value="pending">Väntar</option>
-                      <option value="in-progress">Påbörjad</option>
-                      <option value="completed">Klar</option>
-                      <option value="rejected">Avböjd</option>
-                    </select>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Request Detail */}
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden flex flex-col h-150">
+            {selectedRequest && showRequestDetail ? (
+              <>
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="font-semibold text-lg">
+                        {selectedRequest.name}
+                      </h2>
+                      <p className="text-sm text-slate-500 flex items-center gap-1 mt-1">
+                        <FiAtSign className="w-3 h-3" />
+                        {selectedRequest.email}
+                      </p>
+                    </div>
                     <button
-                      onClick={() => handleDeleteRequest(req._id)}
-                      className="text-red-500 hover:text-red-700 p-1"
+                      onClick={() => setShowRequestDetail(false)}
+                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
                     >
-                      <FiTrash2 className="w-5 h-5" />
+                      <FiX className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider">
+                      Typ av hemsida
+                    </label>
+                    <p className="font-medium">{selectedRequest.websiteType}</p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider">
+                      Beskrivning
+                    </label>
+                    <p className="text-sm">{selectedRequest.description}</p>
+                  </div>
+
+                  {selectedRequest.requirements && (
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">
+                        Specifika krav
+                      </label>
+                      <p className="text-sm">{selectedRequest.requirements}</p>
+                    </div>
+                  )}
+
+                  {selectedRequest.deadline && (
+                    <div className="flex items-center gap-2">
+                      <FiCalendar className="w-4 h-4 text-orange-500" />
+                      <div>
+                        <label className="text-xs text-slate-500 uppercase tracking-wider">
+                          Deadline
+                        </label>
+                        <p className="text-sm font-medium">
+                          {selectedRequest.deadline}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider">
+                      Budget
+                    </label>
+                    <p className="text-sm">
+                      {selectedRequest.budget === "gratis" && "🆓 Helt gratis"}
+                      {selectedRequest.budget === "donation" &&
+                        "💝 Kan donera frivilligt"}
+                      {selectedRequest.budget === "ingen" &&
+                        "📋 Ingen budget just nu"}
+                    </p>
+                  </div>
+
+                  {selectedRequest.status === "in-progress" && (
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider mb-2 block">
+                        Framsteg
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={requestProgress[selectedRequest._id] || 0}
+                          onChange={(e) =>
+                            handleUpdateProgress(
+                              selectedRequest._id,
+                              parseInt(e.target.value),
+                            )
+                          }
+                          className="flex-1"
+                        />
+                        <span className="text-sm font-medium w-12 text-center">
+                          {requestProgress[selectedRequest._id] || 0}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider">
+                      Admin anteckning
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={selectedRequest.adminNotes || ""}
+                      onChange={(e) => {
+                        const updated = {
+                          ...selectedRequest,
+                          adminNotes: e.target.value,
+                        };
+                        setSelectedRequest(updated);
+                      }}
+                      onBlur={async () => {
+                        if (selectedRequest.adminNotes !== undefined) {
+                          await updateRequestStatus({
+                            id: selectedRequest._id as Id<"requests">,
+                            status: selectedRequest.status,
+                            adminNotes: selectedRequest.adminNotes,
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                      placeholder="Lägg till interna anteckningar..."
+                    />
+                  </div>
+
+                  {selectedRequest.status === "completed" && (
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">
+                        Länk till färdig hemsida
+                      </label>
+                      <input
+                        type="url"
+                        value={selectedRequest.completedUrl || ""}
+                        onChange={(e) => {
+                          const updated = {
+                            ...selectedRequest,
+                            completedUrl: e.target.value,
+                          };
+                          setSelectedRequest(updated);
+                        }}
+                        onBlur={async () => {
+                          await updateRequestStatus({
+                            id: selectedRequest._id as Id<"requests">,
+                            status: selectedRequest.status,
+                            completedUrl: selectedRequest.completedUrl,
+                          });
+                        }}
+                        className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                        placeholder="https://..."
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedRequest.status}
+                      onChange={(e) => {
+                        const newStatus = e.target.value;
+                        handleUpdateStatus(
+                          selectedRequest._id as Id<"requests">,
+                          newStatus,
+                        );
+                        setSelectedRequest({
+                          ...selectedRequest,
+                          status: newStatus,
+                        });
+                      }}
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                    >
+                      <option value="pending">📋 Väntar på beslut</option>
+                      <option value="in-progress">⚙️ Påbörjad</option>
+                      <option value="completed">✅ Färdigställd</option>
+                      <option value="rejected">❌ Avböjd</option>
+                    </select>
+
+                    <div className="flex items-center gap-1">
+                      <FiFlag
+                        className={`w-4 h-4 ${getPriorityColor(selectedRequest.priority)}`}
+                      />
+                      <select
+                        value={selectedRequest.priority}
+                        onChange={(e) => {
+                          const newPriority = parseInt(e.target.value);
+                          handleUpdatePriority(
+                            selectedRequest._id as Id<"requests">,
+                            newPriority,
+                          );
+                          setSelectedRequest({
+                            ...selectedRequest,
+                            priority: newPriority,
+                          });
+                        }}
+                        className="px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                      >
+                        <option value="1">⭐ 1 (Låg)</option>
+                        <option value="2">⭐⭐ 2</option>
+                        <option value="3">⭐⭐⭐ 3 (Normal)</option>
+                        <option value="4">⭐⭐⭐⭐ 4</option>
+                        <option value="5">⭐⭐⭐⭐⭐ 5 (Hög)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      handleDeleteRequest(selectedRequest._id as Id<"requests">)
+                    }
+                    className="w-full px-3 py-2 text-sm border border-red-500 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <FiTrash2 className="w-4 h-4" />
+                    Radera förfrågan
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-slate-500">
+                <div className="text-center">
+                  <FiHeart className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                  <p>Välj en förfrågan från listan</p>
+                  <p className="text-sm">För att hantera detaljer och status</p>
+                </div>
               </div>
-            ))
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

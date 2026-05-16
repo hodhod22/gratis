@@ -11,6 +11,7 @@ import {
   FiCreditCard,
   FiPhone,
 } from "react-icons/fi";
+import WaitingTime from "@/components/WaitingTime";
 
 export default function RequestPage() {
   const [formData, setFormData] = useState({
@@ -55,7 +56,6 @@ export default function RequestPage() {
   };
 
   const handleDonation = () => {
-    // Öppna donationssidan
     window.location.href = "/donate";
   };
 
@@ -124,6 +124,13 @@ export default function RequestPage() {
             Frivilligt stöd
           </p>
         </div>
+      </div>
+
+      {/* ================================================ */}
+      {/* HÄR SKA <WaitingTime /> LIGGA - Under info cards, ovanför formuläret */}
+      {/* ================================================ */}
+      <div className="mb-8">
+        <WaitingTime />
       </div>
 
       {/* Formulär */}
@@ -316,7 +323,7 @@ export default function RequestPage() {
             </div>
 
             {/* Swish */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 text-center shadow-lg">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 text-center shadow-lg border-2 border-green-500">
               <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full mb-4">
                 <FiPhone className="w-6 h-6 text-green-600" />
               </div>
@@ -330,7 +337,7 @@ export default function RequestPage() {
                 </p>
               </div>
               <p className="text-xs text-slate-500">
-                Swisha valfritt belopp. Skriv "Donation" i meddelandet.
+                💡 Swisha valfritt belopp. Skriv "Donation" i meddelandet.
               </p>
             </div>
           </div>
@@ -338,9 +345,7 @@ export default function RequestPage() {
           <div className="text-center mt-6 pt-4 border-t border-yellow-200 dark:border-yellow-800/50">
             <p className="text-xs text-slate-500">
               💡 <strong>Ingen behöver donera</strong> - din hemsida är helt
-              gratis oavsett om du donerar eller inte. Donationer används för
-              att täcka kostnader för server, domän och för att jag ska kunna
-              hjälpa fler.
+              gratis oavsett om du donerar eller inte.
             </p>
           </div>
         </div>

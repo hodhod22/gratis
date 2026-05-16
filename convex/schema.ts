@@ -52,7 +52,6 @@ export default defineSchema({
     .index("by_isActive", ["isActive"])
     .index("by_lastMessageAt", ["lastMessageAt"]),
 
-  // Förfrågningar om gratis hemsidor
   requests: defineTable({
     name: v.string(),
     email: v.string(),
@@ -80,4 +79,11 @@ export default defineSchema({
     isAnonymous: v.boolean(),
     createdAt: v.number(),
   }).index("by_createdAt", ["createdAt"]),
+
+  // Admin status tabell för online/offline indikator
+  adminStatus: defineTable({
+    isOnline: v.boolean(),
+    lastSeen: v.number(),
+    lastActive: v.number(),
+  }),
 });

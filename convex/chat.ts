@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Hämta meddelanden för en specifik användare
 export const getMessagesByEmail = query({
   args: { email: v.string() },
   handler: async (ctx, args) => {
@@ -14,7 +13,6 @@ export const getMessagesByEmail = query({
   },
 });
 
-// Skicka meddelande (från kund)
 export const sendMessage = mutation({
   args: {
     name: v.string(),
@@ -22,6 +20,8 @@ export const sendMessage = mutation({
     message: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log("💬 Nytt meddelande från:", args.name, "(", args.email, ")");
+
     if (!args.email) {
       throw new Error("Du måste vara inloggad för att skicka meddelanden");
     }
@@ -35,22 +35,20 @@ export const sendMessage = mutation({
 
     const existingConv = await ctx.db
       .query("conversations")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .filter((q) => q.eq(q.field("email"), args.email))
       .first();
 
     if (existingConv) {
-      const newUnreadCount = existingConv.isActive
-        ? 0
-        : existingConv.unreadCount + 1;
       await ctx.db.patch(existingConv._id, {
         lastMessageAt: Date.now(),
-        unreadCount: newUnreadCount,
+        unreadCount: (existingConv.unreadCount || 0) + 1,
+        isActive: true,
       });
     } else {
       await ctx.db.insert("conversations", {
         email: args.email,
         name: args.name,
-        isActive: false,
+        isActive: true,
         lastMessageAt: Date.now(),
         unreadCount: 1,
       });
@@ -60,7 +58,6 @@ export const sendMessage = mutation({
   },
 });
 
-// Skicka svar från admin
 export const sendAdminReply = mutation({
   args: {
     toEmail: v.string(),
@@ -79,11 +76,15 @@ export const sendAdminReply = mutation({
 
     const conv = await ctx.db
       .query("conversations")
-      .withIndex("by_email", (q) => q.eq("email", args.toEmail))
+      .filter((q) => q.eq(q.field("email"), args.toEmail))
       .first();
 
     if (conv) {
-      await ctx.db.patch(conv._id, { lastMessageAt: Date.now() });
+      await ctx.db.patch(conv._id, {
+        lastMessageAt: Date.now(),
+        unreadCount: 0,
+        isActive: true,
+      });
     }
 
     return { success: true };

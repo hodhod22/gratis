@@ -7,7 +7,7 @@ import {
   FiLinkedin,
   FiSend,
   FiMapPin,
-  FiPhone,
+  FiCheck,
 } from "react-icons/fi";
 
 export default function Contact() {
@@ -70,11 +70,12 @@ export default function Contact() {
               <div>
                 <h3 className="font-semibold">GitHub</h3>
                 <a
-                  href="https://github.com/dittanvandarnamn"
+                  href="https://github.com/hodhod22"
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="text-slate-600 dark:text-slate-400 hover:text-blue-600"
                 >
-                  /dittanvandarnamn
+                  /hodhod22
                 </a>
               </div>
             </div>
@@ -86,6 +87,7 @@ export default function Contact() {
                 <a
                   href="https://linkedin.com/in/dittnamn"
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="text-slate-600 dark:text-slate-400 hover:text-blue-600"
                 >
                   /in/dittnamn

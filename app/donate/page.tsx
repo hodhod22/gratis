@@ -9,18 +9,30 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { FaHeart, FaStar, FaGift, FaShieldAlt } from "react-icons/fa";
+import {
+  FiPhone,
+  FiCopy,
+  FiCheck,
+  FiSmartphone,
+  FiCreditCard,
+} from "react-icons/fi";
 import { motion } from "framer-motion";
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
 
-const donationAmounts = [5, 10, 20, 50, 100];
+const donationAmounts = [50, 100, 200, 500, 1000];
+
+// Swish och Revolut uppgifter
+const SWISH_NUMBER = "0722972894"; // Byt till ditt Swish-nummer
+const REVOLUT_USERNAME = "@aezadkhaha"; // Byt till ditt Revolut användarnamn
+const REVOLUT_LINK = "https://revolut.me/aezadkhaha"; // Byt till din Revolut-länk
 
 function DonationForm() {
   const stripe = useStripe();
   const elements = useElements();
-  const [amount, setAmount] = useState(10);
+  const [amount, setAmount] = useState(100);
   const [customAmount, setCustomAmount] = useState("");
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
@@ -30,18 +42,23 @@ function DonationForm() {
   const [error, setError] = useState<string | null>(null);
   const [isStripeReady, setIsStripeReady] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [copiedSwish, setCopiedSwish] = useState(false);
+  const [copiedRevolut, setCopiedRevolut] = useState(false);
 
-  // Detektera dark mode
+  useEffect(() => {
+    if (stripe && elements) {
+      setIsStripeReady(true);
+    }
+  }, [stripe, elements]);
+
   useEffect(() => {
     const isDark = document.documentElement.classList.contains("dark");
     setIsDarkMode(isDark);
 
-    // Lyssna på dark mode ändringar
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.attributeName === "class") {
-          const isDarkNow = document.documentElement.classList.contains("dark");
-          setIsDarkMode(isDarkNow);
+          setIsDarkMode(document.documentElement.classList.contains("dark"));
         }
       });
     });
@@ -50,24 +67,14 @@ function DonationForm() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (stripe && elements) {
-      setIsStripeReady(true);
-    }
-  }, [stripe, elements]);
-
-  // Dynamisk styling för CardElement baserat på dark mode
   const cardElementOptions = {
     style: {
       base: {
         fontSize: "16px",
-        color: isDarkMode ? "#f1f5f9" : "#1f2937", // Ljus text i dark mode
+        color: isDarkMode ? "#f1f5f9" : "#1f2937",
         backgroundColor: isDarkMode ? "#1e293b" : "#ffffff",
         "::placeholder": {
           color: isDarkMode ? "#64748b" : "#9ca3af",
-        },
-        ":-webkit-autofill": {
-          color: isDarkMode ? "#f1f5f9" : "#1f2937",
         },
       },
       invalid: {
@@ -106,7 +113,6 @@ function DonationForm() {
         });
 
       if (cardError) {
-        console.error("Card error:", cardError);
         setError(
           cardError.message || "Ett fel uppstod med kortet. Försök igen.",
         );
@@ -167,6 +173,28 @@ function DonationForm() {
     }
   };
 
+  const copySwishNumber = () => {
+    navigator.clipboard.writeText(SWISH_NUMBER.replace(/\s/g, ""));
+    setCopiedSwish(true);
+    setTimeout(() => setCopiedSwish(false), 2000);
+  };
+
+  const copyRevolutUsername = () => {
+    navigator.clipboard.writeText(REVOLUT_USERNAME);
+    setCopiedRevolut(true);
+    setTimeout(() => setCopiedRevolut(false), 2000);
+  };
+
+  const openSwish = () => {
+    const cleanNumber = SWISH_NUMBER.replace(/\s/g, "");
+    window.location.href = `swish://payment?data=${cleanNumber}`;
+    setTimeout(() => copySwishNumber(), 1000);
+  };
+
+  const openRevolut = () => {
+    window.open(REVOLUT_LINK, "_blank");
+  };
+
   if (!isStripeReady) {
     return (
       <div className="text-center py-8">
@@ -179,127 +207,214 @@ function DonationForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium mb-3 text-slate-700 dark:text-slate-300">
-          Välj donationsbelopp (SEK)
-        </label>
-        <div className="grid grid-cols-5 gap-2 mb-3">
-          {donationAmounts.map((amt) => (
-            <button
-              key={amt}
-              type="button"
-              onClick={() => handleAmountSelect(amt)}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                amount === amt && !customAmount
-                  ? "bg-linear-to-r from-blue-600 to-purple-600 text-white shadow-lg scale-105"
-                  : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-900"
-              }`}
-            >
-              {amt} kr
-            </button>
-          ))}
-        </div>
-        <input
-          type="number"
-          value={customAmount}
-          onChange={handleCustomAmount}
-          placeholder="Eget belopp"
-          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 text-slate-900 dark:text-white"
-          min="5"
-          step="5"
-        />
-      </div>
-
-      {!isAnonymous && (
-        <>
+    <div className="space-y-8">
+      {/* Stripe Card Form */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <FiCreditCard className="text-blue-600" />
+          Kortbetalning (Stripe)
+        </h3>
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-              Ditt namn
+            <label className="block text-sm font-medium mb-3 text-slate-700 dark:text-slate-300">
+              Välj donationsbelopp (SEK)
             </label>
+            <div className="grid grid-cols-5 gap-2 mb-3">
+              {donationAmounts.map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => handleAmountSelect(amt)}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                    amount === amt && !customAmount
+                      ? "bg-linear-to-r from-blue-600 to-purple-600 text-white shadow-lg scale-105"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                  }`}
+                >
+                  {amt} kr
+                </button>
+              ))}
+            </div>
             <input
-              type="text"
-              value={donorName}
-              onChange={(e) => setDonorName(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 text-slate-900 dark:text-white"
-              required={!isAnonymous}
-              placeholder="Namn"
+              type="number"
+              value={customAmount}
+              onChange={handleCustomAmount}
+              placeholder="Eget belopp"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+              min="5"
+              step="5"
             />
           </div>
 
+          {!isAnonymous && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Ditt namn
+                </label>
+                <input
+                  type="text"
+                  value={donorName}
+                  onChange={(e) => setDonorName(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+                  required={!isAnonymous}
+                  placeholder="Namn"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Din e-post
+                </label>
+                <input
+                  type="email"
+                  value={donorEmail}
+                  onChange={(e) => setDonorEmail(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+                  required
+                  placeholder="email@exempel.se"
+                />
+              </div>
+            </>
+          )}
+
           <div>
-            <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-              Din e-post
+            <label className="block text-sm font-medium mb-2">
+              Meddelande (Valfritt)
             </label>
-            <input
-              type="email"
-              value={donorEmail}
-              onChange={(e) => setDonorEmail(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 text-slate-900 dark:text-white"
-              required
-              placeholder="email@exempel.se"
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={2}
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+              placeholder="Skriv ett stödjande meddelande..."
             />
           </div>
-        </>
-      )}
 
-      <div>
-        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-          Meddelande (Valfritt)
-        </label>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={3}
-          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 text-slate-900 dark:text-white"
-          placeholder="Skriv ett stödjande meddelande..."
-        />
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="anonymous"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+              className="w-4 h-4 text-blue-600"
+            />
+            <label htmlFor="anonymous" className="text-sm">
+              Donera anonymt
+            </label>
+          </div>
+
+          <div className="border rounded-lg p-4 bg-white dark:bg-slate-800">
+            <label className="block text-sm font-medium mb-3">
+              Kortuppgifter
+            </label>
+            <CardElement options={cardElementOptions} />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-linear-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:opacity-90 disabled:opacity-50"
+          >
+            {loading ? "Bearbetar..." : `Donera ${amount} kr`}
+          </button>
+        </form>
       </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="anonymous"
-          checked={isAnonymous}
-          onChange={(e) => setIsAnonymous(e.target.checked)}
-          className="w-4 h-4 text-blue-600"
-        />
-        <label
-          htmlFor="anonymous"
-          className="text-sm text-slate-700 dark:text-slate-300"
-        >
-          Donera anonymt
-        </label>
-      </div>
-
-      <div className="border rounded-lg p-4 bg-white dark:bg-slate-800 transition-colors">
-        <label className="block text-sm font-medium mb-3 text-slate-700 dark:text-slate-300">
-          Kortuppgifter
-        </label>
-        <div className="dark:text-white">
-          <CardElement options={cardElementOptions} />
+      {/* Swish Donation */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border-2 border-green-500">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+            <FiPhone className="w-5 h-5 text-green-600" />
+          </div>
+          <h3 className="text-lg font-semibold">Donera via Swish</h3>
         </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+          Swisha valfritt belopp direkt från din mobil. Inga avgifter, direkt
+          till mig.
+        </p>
+        <div className="bg-green-50 dark:bg-green-950/50 p-4 rounded-lg mb-4 text-center">
+          <p className="text-2xl font-mono font-bold text-green-700 dark:text-green-400">
+            {SWISH_NUMBER}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={openSwish}
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <FiPhone className="w-4 h-4" />
+            Öppna Swish
+          </button>
+          <button
+            onClick={copySwishNumber}
+            className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-950 transition-colors flex items-center gap-2"
+          >
+            {copiedSwish ? (
+              <FiCheck className="w-4 h-4" />
+            ) : (
+              <FiCopy className="w-4 h-4" />
+            )}
+            {copiedSwish ? "Kopierat!" : "Kopiera"}
+          </button>
+        </div>
+        <p className="text-xs text-slate-500 mt-3 text-center">
+          💡 Swisha valfritt belopp. Skriv "Donation" i meddelandet.
+        </p>
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-sm">
-          {error}
+      {/* Revolut Donation */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border-2 border-blue-400">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+            <FiSmartphone className="w-5 h-5 text-blue-600" />
+          </div>
+          <h3 className="text-lg font-semibold">Donera via Revolut</h3>
         </div>
-      )}
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+          Donera internationellt via Revolut. Snabbt och enkelt.
+        </p>
+        <div className="bg-blue-50 dark:bg-blue-950/50 p-4 rounded-lg mb-4 text-center">
+          <p className="text-lg font-mono font-bold text-blue-700 dark:text-blue-400 break-all">
+            {REVOLUT_USERNAME}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={openRevolut}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <FiSmartphone className="w-4 h-4" />
+            Öppna Revolut
+          </button>
+          <button
+            onClick={copyRevolutUsername}
+            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors flex items-center gap-2"
+          >
+            {copiedRevolut ? (
+              <FiCheck className="w-4 h-4" />
+            ) : (
+              <FiCopy className="w-4 h-4" />
+            )}
+            {copiedRevolut ? "Kopierat!" : "Kopiera"}
+          </button>
+        </div>
+        <p className="text-xs text-slate-500 mt-3 text-center">
+          💡 Klicka på Revolut-knappen för att donera via Revolut-appen eller
+          webben.
+        </p>
+      </div>
 
-      <button
-        type="submit"
-        disabled={loading || !isStripeReady}
-        className="w-full bg-linear-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition"
-      >
-        {loading ? "Bearbetar..." : `Donera ${amount} kr`}
-      </button>
-
-      <p className="text-xs text-center text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1">
+      <p className="text-xs text-center text-slate-500 flex items-center justify-center gap-1">
         <FaShieldAlt />
-        Säkra betalningar via Stripe
+        Säkra betalningar via Stripe • Swish • Revolut
       </p>
-    </form>
+    </div>
   );
 }
 
@@ -316,11 +431,10 @@ export default function DonatePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-12">
+    <div className="container mx-auto px-4 py-12 max-w-2xl">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl mx-auto"
       >
         <div className="text-center mb-8">
           <motion.div
@@ -332,44 +446,36 @@ export default function DonatePage() {
           <h1 className="text-4xl font-bold mb-4 bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Stöd Mitt Arbete
           </h1>
-          <p className="text-slate-600 dark:text-slate-300">
+          <p className="text-slate-600 dark:text-slate-400">
             Alla hemsidor är helt gratis. Men om du vill stödja mig så att jag
             kan hjälpa fler, är donationer varmt välkomna!
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 md:p-8">
-          <Elements stripe={stripePromise}>
-            <DonationForm />
-          </Elements>
-        </div>
+        <Elements stripe={stripePromise}>
+          <DonationForm />
+        </Elements>
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center p-4">
             <FaStar className="text-3xl text-yellow-500 mx-auto mb-3" />
-            <h3 className="font-semibold mb-2 text-slate-900 dark:text-white">
-              Helt Gratis
-            </h3>
+            <h3 className="font-semibold mb-2">Helt Gratis</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Ingen behöver donera. Alla hemsidor är gratis.
+              Ingen behöver donera
             </p>
           </div>
           <div className="text-center p-4">
             <FaGift className="text-3xl text-purple-500 mx-auto mb-3" />
-            <h3 className="font-semibold mb-2 text-slate-900 dark:text-white">
-              Frivilligt Stöd
-            </h3>
+            <h3 className="font-semibold mb-2">Frivilligt Stöd</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Donationer hjälper mig att hjälpa fler människor.
+              Donationer hjälper mig hjälpa fler
             </p>
           </div>
           <div className="text-center p-4">
             <FaHeart className="text-3xl text-red-500 mx-auto mb-3" />
-            <h3 className="font-semibold mb-2 text-slate-900 dark:text-white">
-              Göra Skillnad
-            </h3>
+            <h3 className="font-semibold mb-2">Göra Skillnad</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Varje bidrag gör det möjligt för mig att fortsätta.
+              Varje bidrag räknas
             </p>
           </div>
         </div>
