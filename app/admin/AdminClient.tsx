@@ -26,6 +26,9 @@ import {
   FiAlertCircle,
   FiCalendar,
   FiFlag,
+  FiEdit,
+  FiPlus,
+  FiSave,
 } from "react-icons/fi";
 
 interface Conversation {
@@ -64,9 +67,9 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     useState<Conversation | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [activeTab, setActiveTab] = useState<"active" | "closed" | "requests">(
-    "active",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "active" | "closed" | "requests" | "blog"
+  >("active");
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [showRequestDetail, setShowRequestDetail] = useState(false);
   const [requestProgress, setRequestProgress] = useState<{
@@ -75,6 +78,23 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
   const [notificationSound] = useState(true);
   const [lastUnreadCount, setLastUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Spåra vilka konversationer som redan spelat ljud för admin (15 minuters cooldown)
+  const [playedSounds, setPlayedSounds] = useState<Map<string, number>>(
+    new Map(),
+  );
+
+  // Blogg state
+  const [editingBlog, setEditingBlog] = useState<any>(null);
+  const [blogForm, setBlogForm] = useState({
+    title: "",
+    slug: "",
+    excerpt: "",
+    content: "",
+    category: "",
+    tags: "",
+    coverImage: "",
+  });
 
   // Hämta konversationer
   const activeConversations = useQuery(api.admin.getActiveConversations) || [];
@@ -86,6 +106,9 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
 
   // Hämta förfrågningar
   const requests = useQuery(api.admin.getAllRequests) || [];
+
+  // Hämta bloggar
+  const blogs = useQuery(api.blog.getAllPublished) || [];
 
   // Mutationer för konversationer
   const openConversation = useMutation(api.admin.openConversation);
@@ -99,26 +122,29 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
   const updateRequestPriority = useMutation(api.admin.updateRequestPriority);
   const deleteRequest = useMutation(api.admin.deleteRequest);
 
-  // Admin status heartbeat - SIMPLIFIERAD
+  // Mutationer för blogg
+  const createBlog = useMutation(api.blog.createBlog);
+  const updateBlog = useMutation(api.blog.updateBlog);
+  const deleteBlog = useMutation(api.blog.deleteBlog);
+
+  // Admin status heartbeat
+  const updateAdminStatus = useMutation(api.adminStatus.updateAdminStatus);
+
+  // Heartbeat för admin online status
   useEffect(() => {
-    // Sätt admin som online direkt via enklare metod
-    const updateStatus = async () => {
-      try {
-        await fetch("/api/admin-status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isOnline: true }),
-        });
-      } catch (e) {
-        console.log("Status update failed");
-      }
+    updateAdminStatus({ isOnline: true });
+    const interval = setInterval(
+      () => updateAdminStatus({ isOnline: true }),
+      30000,
+    );
+    const handleBeforeUnload = () => updateAdminStatus({ isOnline: false });
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      updateAdminStatus({ isOnline: false });
     };
-
-    updateStatus();
-    const interval = setInterval(updateStatus, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
+  }, [updateAdminStatus]);
 
   const conversations =
     activeTab === "active" ? activeConversations : closedConversations;
@@ -127,75 +153,14 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     0,
   );
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
-  const inProgressRequests = requests.filter(
-    (r) => r.status === "in-progress",
-  ).length;
 
-  // Admin heartbeat - bara om admin är inloggad
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    const sendHeartbeat = async () => {
-      try {
-        await fetch("/api/admin-status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isOnline: true }),
-        });
-      } catch (error) {
-        console.error("Heartbeat failed:", error);
-      }
-    };
-
-    // Skicka direkt
-    sendHeartbeat();
-
-    // Skicka var 30e sekund
-    interval = setInterval(sendHeartbeat, 30000);
-
-    return () => {
-      clearInterval(interval);
-      // Sätt offline när admin-panelen stängs
-      fetch("/api/admin-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOnline: false }),
-      }).catch(() => {});
-    };
-  }, []);
-
-  // Notis när nya meddelanden kommer
-  useEffect(() => {
-    if (totalUnread > lastUnreadCount && notificationSound) {
-      try {
-        const audioContext = new (
-          window.AudioContext || (window as any).webkitAudioContext
-        )();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        oscillator.frequency.value = 880;
-        gainNode.gain.value = 0.2;
-        oscillator.start();
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.00001,
-          audioContext.currentTime + 0.3,
-        );
-        oscillator.stop(audioContext.currentTime + 0.3);
-        setTimeout(() => audioContext.close(), 400);
-      } catch (e) {
-        console.log("Audio not supported");
-      }
-
-      if (totalUnread > 0) {
-        document.title = `(${totalUnread}) Admin Panel - FreeWebDev`;
-      } else {
-        document.title = "Admin Panel - FreeWebDev";
-      }
-    }
-    setLastUnreadCount(totalUnread);
-  }, [totalUnread, lastUnreadCount, notificationSound]);
+ useEffect(() => {
+   if (totalUnread > 0) {
+     document.title = `(${totalUnread}) Admin Panel - FreeWebDev`;
+   } else {
+     document.title = "Admin Panel - FreeWebDev";
+   }
+ }, [totalUnread]);
 
   // Simulera progress för pågående projekt
   useEffect(() => {
@@ -320,6 +285,63 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     }
   };
 
+  // Hantera blogg
+  const handleSaveBlog = async () => {
+    const tagsArray = blogForm.tags.split(",").map((t) => t.trim());
+
+    if (editingBlog) {
+      await updateBlog({
+        id: editingBlog._id,
+        title: blogForm.title,
+        excerpt: blogForm.excerpt,
+        content: blogForm.content,
+        category: blogForm.category,
+        tags: tagsArray,
+        coverImage: blogForm.coverImage,
+      });
+    } else {
+      await createBlog({
+        title: blogForm.title,
+        slug: blogForm.slug,
+        excerpt: blogForm.excerpt,
+        content: blogForm.content,
+        category: blogForm.category,
+        tags: tagsArray,
+        coverImage: blogForm.coverImage,
+      });
+    }
+
+    setEditingBlog(null);
+    setBlogForm({
+      title: "",
+      slug: "",
+      excerpt: "",
+      content: "",
+      category: "",
+      tags: "",
+      coverImage: "",
+    });
+  };
+
+  const handleEditBlog = (blog: any) => {
+    setEditingBlog(blog);
+    setBlogForm({
+      title: blog.title,
+      slug: blog.slug,
+      excerpt: blog.excerpt,
+      content: blog.content,
+      category: blog.category,
+      tags: blog.tags.join(", "),
+      coverImage: blog.coverImage || "",
+    });
+  };
+
+  const handleDeleteBlog = async (id: string) => {
+    if (confirm("Är du säker på att du vill radera detta blogginlägg?")) {
+      await deleteBlog({ id: id as any });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -350,14 +372,14 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header med notiser */}
+      {/* Header */}
       <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Admin Panel
           </h1>
           <p className="text-slate-600 dark:text-slate-400 text-sm">
-            Hantera konversationer, förfrågningar och projekt
+            Hantera konversationer, förfrågningar och blogg
           </p>
           <p className="text-xs text-green-600 mt-1">
             ✅ Inloggad som admin: {adminEmail}
@@ -382,7 +404,7 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
             <FiUsers className="w-5 h-5 text-blue-500" />
             <div>
               <p className="text-xl font-bold">{activeConversations.length}</p>
-              <p className="text-xs text-slate-500">Aktiva</p>
+              <p className="text-xs text-slate-500">Aktiva konversationer</p>
             </div>
           </div>
         </div>
@@ -392,7 +414,7 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
             <FiArchive className="w-5 h-5 text-orange-500" />
             <div>
               <p className="text-xl font-bold">{closedConversations.length}</p>
-              <p className="text-xs text-slate-500">Stängda</p>
+              <p className="text-xs text-slate-500">Stängda konversationer</p>
             </div>
           </div>
         </div>
@@ -409,17 +431,17 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
 
         <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-lg">
           <div className="flex items-center gap-2">
-            <FiClock className="w-5 h-5 text-yellow-500" />
+            <FiEdit className="w-5 h-5 text-green-500" />
             <div>
-              <p className="text-xl font-bold">{pendingRequests}</p>
-              <p className="text-xs text-slate-500">Väntande</p>
+              <p className="text-xl font-bold">{blogs.length}</p>
+              <p className="text-xs text-slate-500">Blogginlägg</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-slate-200 dark:border-slate-700">
+      <div className="flex gap-2 mb-6 border-b border-slate-200 dark:border-slate-700 flex-wrap">
         <button
           onClick={() => setActiveTab("active")}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -462,6 +484,17 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
               {pendingRequests} nya
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab("blog")}
+          className={`px-4 py-2 font-medium transition-colors ${
+            activeTab === "blog"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <FiEdit className="inline mr-2 w-4 h-4" />
+          Blogg ({blogs.length})
         </button>
       </div>
 
@@ -950,6 +983,167 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
                   <p className="text-sm">För att hantera detaljer och status</p>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Blogg sektion */}
+      {activeTab === "blog" && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <FiEdit className="text-blue-500" /> Blogginlägg
+          </h2>
+
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4 mb-6">
+            <h3 className="font-medium mb-3">
+              {editingBlog ? "✏️ Redigera inlägg" : "📝 Skapa nytt inlägg"}
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <input
+                type="text"
+                placeholder="Titel"
+                value={blogForm.title}
+                onChange={(e) =>
+                  setBlogForm({ ...blogForm, title: e.target.value })
+                }
+                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+              />
+              <input
+                type="text"
+                placeholder="Slug (url-namn)"
+                value={blogForm.slug}
+                onChange={(e) =>
+                  setBlogForm({ ...blogForm, slug: e.target.value })
+                }
+                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Kort sammanfattning"
+              value={blogForm.excerpt}
+              onChange={(e) =>
+                setBlogForm({ ...blogForm, excerpt: e.target.value })
+              }
+              className="w-full mb-4 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+            />
+            <textarea
+              placeholder="Innehåll (Markdown-stöd)"
+              rows={8}
+              value={blogForm.content}
+              onChange={(e) =>
+                setBlogForm({ ...blogForm, content: e.target.value })
+              }
+              className="w-full mb-4 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 font-mono text-sm"
+            />
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <input
+                type="text"
+                placeholder="Kategori (t.ex. Next.js)"
+                value={blogForm.category}
+                onChange={(e) =>
+                  setBlogForm({ ...blogForm, category: e.target.value })
+                }
+                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+              />
+              <input
+                type="text"
+                placeholder="Taggar (separera med kommatecken)"
+                value={blogForm.tags}
+                onChange={(e) =>
+                  setBlogForm({ ...blogForm, tags: e.target.value })
+                }
+                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Bild-URL (valfritt)"
+              value={blogForm.coverImage}
+              onChange={(e) =>
+                setBlogForm({ ...blogForm, coverImage: e.target.value })
+              }
+              className="w-full mb-4 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveBlog}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <FiSave /> {editingBlog ? "Uppdatera" : "Publicera"}
+              </button>
+              {editingBlog && (
+                <button
+                  onClick={() => {
+                    setEditingBlog(null);
+                    setBlogForm({
+                      title: "",
+                      slug: "",
+                      excerpt: "",
+                      content: "",
+                      category: "",
+                      tags: "",
+                      coverImage: "",
+                    });
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600"
+                >
+                  Avbryt
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-medium mb-2">📄 Befintliga inlägg</h3>
+            {blogs.length === 0 ? (
+              <p className="text-slate-500 text-center py-8">
+                Inga blogginlägg ännu. Skapa ditt första! ✍️
+              </p>
+            ) : (
+              blogs.map((blog) => (
+                <div
+                  key={blog._id}
+                  className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg"
+                >
+                  <div className="flex-1">
+                    <h3 className="font-medium">{blog.title}</h3>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="text-xs text-slate-500">
+                        {blog.category}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {blog.readTime} min läsning
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {new Date(blog.publishedAt).toLocaleDateString("sv-SE")}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={`/blog/${blog.slug}`}
+                      target="_blank"
+                      className="p-1 text-green-600 hover:bg-green-100 rounded"
+                    >
+                      <FiEye />
+                    </a>
+                    <button
+                      onClick={() => handleEditBlog(blog)}
+                      className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                    >
+                      <FiEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBlog(blog._id)}
+                      className="p-1 text-red-600 hover:bg-red-100 rounded"
+                    >
+                      <FiTrash2 />
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>

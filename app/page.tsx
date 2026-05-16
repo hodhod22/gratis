@@ -1,20 +1,17 @@
+import { Suspense } from "react";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import Hero from "@/components/Hero";
 import TechStack from "@/components/TechStack";
 import ProjectCard from "@/components/ProjectCard";
-import Contact from "@/components/Contact";
 import CVButton from "@/components/CVButton";
-import PerformanceScore from "@/components/PerformanceScore";
-import Testimonials from "@/components/Testimonials";
-import GithubActivity from "@/components/GithubActivity";
 import Stats from "@/components/Stats";
 import { Doc } from "@/convex/_generated/dataModel";
 
 export const metadata = {
   title: "Gratis Hemsida - FreeWebDev",
   description:
-    "Få en gratis hemsida byggd av en erfaren webbutvecklare. Helt gratis, ingen kostnad.",
+    "Få en gratis hemsida byggd av en erfaren webbutvecklare. Helt gratis, ingen kostnad. Perfekt för småföretag, privatpersoner och organisationer.",
 };
 
 export default async function Home() {
@@ -29,12 +26,6 @@ export default async function Home() {
       <section className="text-center py-12 bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
         <div className="container mx-auto px-4">
           <CVButton />
-        </div>
-      </section>
-
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <PerformanceScore />
         </div>
       </section>
 
@@ -76,16 +67,6 @@ export default async function Home() {
           </div>
         </div>
       </section>
-
-      <Testimonials />
-
-      <section className="py-20 bg-white dark:bg-slate-900">
-        <div className="container mx-auto px-4 max-w-4xl">
-          <GithubActivity />
-        </div>
-      </section>
-
-      <Contact />
     </>
   );
 }

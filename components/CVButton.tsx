@@ -10,24 +10,32 @@ export default function CVButton() {
   const handleDownload = async () => {
     setIsDownloading(true);
 
-    // Simulera nedladdning - lägg din CV i public/cv/ mappen
-    setTimeout(() => {
-      setIsDownloading(false);
+    try {
+      // Hämta CV-filen från public mappen
+      const response = await fetch("/cv.pdf");
+
+      if (!response.ok) {
+        throw new Error("CV file not found");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Ali_CV.pdf"; // Namnet som filen får vid nedladdning
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
       setIsDownloaded(true);
       setTimeout(() => setIsDownloaded(false), 3000);
-    }, 1000);
-
-    // Verklig nedladdning (när du har en CV-fil)
-    // const response = await fetch("/cv/your-cv.pdf");
-    // const blob = await response.blob();
-    // const url = window.URL.createObjectURL(blob);
-    // const a = document.createElement("a");
-    // a.href = url;
-    // a.download = "Cecilia_Wiklund_CV.pdf";
-    // document.body.appendChild(a);
-    // a.click();
-    // window.URL.revokeObjectURL(url);
-    // document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Kunde inte ladda ner CV. Kontakta mig direkt istället.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (

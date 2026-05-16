@@ -10,13 +10,13 @@ export async function POST(request: Request) {
     lastSeen = Date.now();
     console.log("Admin status updated:", isOnline ? "🟢 ONLINE" : "🔴 OFFLINE");
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }
 
 export async function GET() {
-  const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
-  const isOnline = adminOnline && lastSeen > twoMinutesAgo;
+  const oneMinuteAgo = Date.now() - 60 * 1000; // 1 minut timeout
+  const isOnline = adminOnline && lastSeen > oneMinuteAgo;
   return NextResponse.json({ isOnline });
 }

@@ -9,50 +9,35 @@ import {
   FiUser,
 } from "react-icons/fi";
 import Link from "next/link";
-import { Metadata } from "next";
 
 interface BlogPostPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
-export async function generateMetadata({
-  params,
-}: BlogPostPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: BlogPostPageProps) {
+  const { slug } = await params;
   try {
-    const blog = await fetchQuery(api.blog.getBySlug, { slug: params.slug });
-
-    if (!blog) {
-      return {
-        title: "Blogginlägg ej hittat",
-      };
-    }
-
+    const blog = await fetchQuery(api.blog.getBySlug, { slug });
+    if (!blog) return { title: "Blogginlägg ej hittat" };
     return {
-      title: `${blog.title} | Min Portfolio`,
+      title: `${blog.title} | FreeWebDev`,
       description: blog.excerpt,
-      openGraph: {
-        title: blog.title,
-        description: blog.excerpt,
-        type: "article",
-        publishedTime: new Date(blog.publishedAt).toISOString(),
-        tags: blog.tags,
-      },
     };
   } catch {
-    return {
-      title: "Blogginlägg ej hittat",
-    };
+    return { title: "Blogginlägg ej hittat" };
   }
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
+  const { slug } = await params;
+
   try {
-    const blog = await fetchQuery(api.blog.getBySlug, { slug: params.slug });
+    const blog = await fetchQuery(api.blog.getBySlug, { slug });
 
     if (!blog) {
-      notFound();
+      return notFound();
     }
 
     const date = new Date(blog.publishedAt).toLocaleDateString("sv-SE", {
@@ -61,8 +46,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       day: "numeric",
     });
 
-    // Enkel markdown-formattering
     const formatContent = (content: string) => {
+      if (!content) return <p>Inget innehåll</p>;
+
       return content.split("\n").map((line, index) => {
         if (line.startsWith("# ")) {
           return (
@@ -93,12 +79,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           );
         }
         if (line.startsWith("```")) {
+          const code = line.replace(/```/g, "");
           return (
             <pre
               key={index}
               className="bg-slate-900 text-white p-4 rounded-lg overflow-x-auto my-4"
             >
-              <code>{line.replace(/```/g, "")}</code>
+              <code>{code}</code>
             </pre>
           );
         }
@@ -115,7 +102,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 max-w-4xl">
-        {/* Back button */}
+        {/* Tillbaka knapp - toppen */}
         <Link
           href="/blog"
           className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 mb-8 transition-colors"
@@ -124,7 +111,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           Tillbaka till bloggen
         </Link>
 
-        {/* Header */}
         <header className="mb-8">
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400 mb-4">
             <span className="flex items-center gap-1">
@@ -137,7 +123,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             </span>
             <span className="flex items-center gap-1">
               <FiUser className="w-4 h-4" />
-              Cecilia Wiklund
+              Ali
             </span>
           </div>
 
@@ -145,12 +131,11 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             {blog.title}
           </h1>
 
-          {/* Categories and Tags */}
           <div className="flex flex-wrap gap-2">
             <span className="text-sm px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">
               {blog.category}
             </span>
-            {blog.tags.map((tag: string) => (
+            {blog.tags?.map((tag: string) => (
               <span
                 key={tag}
                 className="text-sm px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center gap-1"
@@ -162,7 +147,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           </div>
         </header>
 
-        {/* Cover Image */}
         {blog.coverImage && (
           <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
             <img
@@ -173,36 +157,24 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           </div>
         )}
 
-        {/* Content */}
         <article className="prose prose-lg dark:prose-invert max-w-none">
           {formatContent(blog.content)}
         </article>
 
-        {/* Share Section */}
-        <div className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold mb-4">Dela detta inlägg</h3>
-          <div className="flex gap-4">
-            <a
-              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(blog.title)}&url=${encodeURIComponent(`https://dinportfolio.se/blog/${blog.slug}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              Twitter/X
-            </a>
-            <a
-              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`https://dinportfolio.se/blog/${blog.slug}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              LinkedIn
-            </a>
-          </div>
+        {/* Tillbaka knapp - slutet */}
+        <div className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-700 text-center">
+          <Link
+            href="/blog"
+            className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          >
+            <FiArrowLeft />
+            Tillbaka till bloggen
+          </Link>
         </div>
       </div>
     );
-  } catch {
-    notFound();
+  } catch (error) {
+    console.error("Error loading blog post:", error);
+    return notFound();
   }
 }

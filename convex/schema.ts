@@ -29,16 +29,22 @@ export default defineSchema({
     isPublished: v.boolean(),
   }),
 
-  messages: defineTable({
+  // messages tabell - KORREKT VERSION
+ messages: defineTable({
+  name: v.string(),
+  email: v.string(),
+  message: v.string(),
+  attachments: v.optional(v.array(v.object({
     name: v.string(),
-    email: v.string(),
-    message: v.string(),
-    isRead: v.boolean(),
-    isFromAdmin: v.boolean(),
-    createdAt: v.number(),
-  })
-    .index("by_email", ["email"])
-    .index("by_createdAt", ["createdAt"]),
+    url: v.string(),
+    size: v.number(),
+    type: v.string(),
+  }))),
+  isRead: v.boolean(),
+  isFromAdmin: v.boolean(),
+  createdAt: v.number(),
+}).index("by_email", ["email"])
+  .index("by_createdAt", ["createdAt"]),
 
   conversations: defineTable({
     email: v.string(),
@@ -80,7 +86,6 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_createdAt", ["createdAt"]),
 
-  // Admin status tabell för online/offline indikator
   adminStatus: defineTable({
     isOnline: v.boolean(),
     lastSeen: v.number(),

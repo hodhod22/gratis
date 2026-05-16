@@ -32,7 +32,6 @@ export default function Header() {
   const userEmail = user?.primaryEmailAddress?.emailAddress;
   const isAdmin = userEmail === ADMIN_EMAIL;
 
-  // Uppdatera admin status när inloggningsstatus ändras
   useEffect(() => {
     const updateAdminStatus = async () => {
       try {
@@ -78,7 +77,7 @@ export default function Header() {
     { name: "Projekt", href: "/projects", icon: FiFolder },
     { name: "Blogg", href: "/blog", icon: FiLayers },
     { name: "Gratis hemsida", href: "/request", icon: FiHeart },
-    { name: "Om mig", href: "/about", icon: FiUser },
+    { name: "Om mig", href: "/about", icon: FiUser }, // ← TILLBAKA!
   ];
 
   const logoCss =

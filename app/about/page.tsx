@@ -114,7 +114,7 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold mb-4">Kontakta mig</h2>
           <div className="flex gap-4 justify-center md:justify-start">
             <a
-              href="https://github.com/dittanvandarnamn"
+              href="https://github.com/hodhod22"
               target="_blank"
               className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
@@ -122,20 +122,14 @@ export default function AboutPage() {
               GitHub
             </a>
             <a
-              href="https://linkedin.com/in/dittnamn"
+              href="https://www.linkedin.com/in/ali-utvecklare-966349404"
               target="_blank"
               className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
               <FiLinkedin className="w-5 h-5" />
               LinkedIn
             </a>
-            <a
-              href="mailto:din@email.se"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <FiMail className="w-5 h-5" />
-              Maila mig
-            </a>
+           
           </div>
         </section>
       </div>

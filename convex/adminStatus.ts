@@ -1,11 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// Uppdatera admin status (körs från admin-panelen)
 export const updateAdminStatus = mutation({
-  args: {
-    isOnline: v.boolean(),
-  },
+  args: { isOnline: v.boolean() },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("adminStatus").first();
 
@@ -25,18 +22,15 @@ export const updateAdminStatus = mutation({
   },
 });
 
-// Hämta admin status (för kunder)
 export const getAdminStatus = query({
   handler: async (ctx) => {
     const status = await ctx.db.query("adminStatus").first();
     if (!status) {
-      return { isOnline: false, lastSeen: Date.now(), lastActive: Date.now() };
+      return { isOnline: false };
     }
-    // Om admin inte uppdaterat status på 2 minuter, markera som offline
+    // Admin är online om status uppdaterats inom 2 minuter
     const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
-    if (status.lastActive < twoMinutesAgo && status.isOnline) {
-      return { ...status, isOnline: false };
-    }
-    return status;
+    const isOnline = status.isOnline && status.lastActive > twoMinutesAgo;
+    return { isOnline, lastActive: status.lastActive };
   },
 });

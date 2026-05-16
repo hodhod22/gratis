@@ -18,7 +18,7 @@ const testimonials: Testimonial[] = [
     name: "Anna Svensson",
     role: "Småföretagare",
     content:
-      "Cecilia byggde en fantastisk hemsida åt mitt företag helt gratis! Jag är så tacksam för hennes professionella arbete och hennes engagemang.",
+      "Ali byggde en fantastisk hemsida åt mitt företag helt gratis! Jag är så tacksam för hennes professionella arbete och hennes engagemang.",
     rating: 5,
   },
   {
@@ -34,7 +34,7 @@ const testimonials: Testimonial[] = [
     name: "Erik Johansson",
     role: "Frilansfotograf",
     content:
-      "Min portfolio ser fantastisk ut! Cecilia förstod precis vad jag behövde. Tack så mycket!",
+      "Min portfolio ser fantastisk ut! Ali förstod precis vad jag behövde. Tack så mycket!",
     rating: 5,
   },
   {
@@ -42,7 +42,7 @@ const testimonials: Testimonial[] = [
     name: "Lisa Andersson",
     role: "Ideell förening",
     content:
-      "Vi fick en proffsig hemsida till vår ideella förening helt gratis. Cecilia är en ängel!",
+      "Vi fick en proffsig hemsida till vår ideella förening helt gratis. Ali är en ängel!",
     rating: 5,
   },
 ];

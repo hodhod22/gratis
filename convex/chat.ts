@@ -21,13 +21,12 @@ export const sendMessage = mutation({
   },
   handler: async (ctx, args) => {
     console.log("💬 Nytt meddelande från:", args.name, "(", args.email, ")");
-
-    if (!args.email) {
-      throw new Error("Du måste vara inloggad för att skicka meddelanden");
-    }
+    console.log("💬 Meddelande:", args.message);
 
     await ctx.db.insert("messages", {
-      ...args,
+      name: args.name,
+      email: args.email,
+      message: args.message,
       isRead: false,
       isFromAdmin: false,
       createdAt: Date.now(),
