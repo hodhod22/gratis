@@ -87,7 +87,7 @@ npx convex deploy
 📧 Kontakt
 Har du frågor? Kontakta mig via:
 
-Email: din.ezadkhahaali@gmail.com
+Email: ezadkhahaali@gmail.com
 
 GitHub Issues
 ⭐ Stjärnmärk gärna repot om du gillar projektet!
