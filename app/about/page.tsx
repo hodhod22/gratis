@@ -98,6 +98,13 @@ export default function AboutPage() {
               "PostgreSQL",
               "Git",
               "Figma",
+              "MongoDb",
+              "TanStack Start",
+              "SQL",
+              "three.js",
+              "Python",
+              "C#",
+              "React-Native"
             ].map((tech) => (
               <span
                 key={tech}

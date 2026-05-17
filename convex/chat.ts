@@ -1,7 +1,13 @@
+// convex/chat.ts
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
-import { requireAdmin, requireAuth, requireUserOrAdmin } from "./lib/auth";
+import {
+  requireAdmin,
+  requireAuth,
+  requireUserOrAdmin,
+  isAdmin,
+} from "./lib/auth";
 import { enforceRateLimit } from "./lib/rateLimit";
 
 export const generateUploadUrl = mutation({
@@ -22,11 +28,20 @@ export const getImageUrl = query({
   },
 });
 
+// Uppdaterad: Hantera oinloggade användare
 export const getMessagesByEmail = query({
   args: { email: v.string() },
   handler: async (ctx, args) => {
-    await requireUserOrAdmin(ctx, args.email);
     const email = args.email.toLowerCase();
+    const identity = await ctx.auth.getUserIdentity();
+    const isAdminUser = identity?.email === "ezadkhahaali@gmail.com";
+    const isOwner = identity?.email === email;
+
+    // Om inte inloggad, inte admin, eller inte ägare - returnera tom array
+    if (!identity || (!isAdminUser && !isOwner)) {
+      return [];
+    }
+
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_email", (q) => q.eq("email", email))
@@ -35,13 +50,23 @@ export const getMessagesByEmail = query({
   },
 });
 
+// Uppdaterad: Hantera oinloggade användare
 export const getCustomerUnreadCount = query({
   args: { email: v.string() },
   handler: async (ctx, args) => {
-    await requireUserOrAdmin(ctx, args.email);
+    const email = args.email.toLowerCase();
+    const identity = await ctx.auth.getUserIdentity();
+    const isAdminUser = identity?.email === "ezadkhahaali@gmail.com";
+    const isOwner = identity?.email === email;
+
+    // Om inte inloggad, inte admin, eller inte ägare - returnera 0
+    if (!identity || (!isAdminUser && !isOwner)) {
+      return 0;
+    }
+
     const conv = await ctx.db
       .query("conversations")
-      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
     return conv?.customerUnreadCount ?? 0;
   },
@@ -51,12 +76,13 @@ export const markCustomerMessagesRead = mutation({
   args: { email: v.string() },
   handler: async (ctx, args) => {
     const authEmail = await requireAuth(ctx);
-    if (authEmail !== args.email.toLowerCase()) {
+    const email = args.email.toLowerCase();
+    if (authEmail !== email) {
       throw new Error("Du får bara markera din egen chatt som läst");
     }
     const conv = await ctx.db
       .query("conversations")
-      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
     if (conv) {
       await ctx.db.patch(conv._id, { customerUnreadCount: 0 });

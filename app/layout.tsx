@@ -5,7 +5,8 @@ import { Providers } from "./providers";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ClientWidgets from "@/components/ClientWidgets";
-
+import MeetingWidget from "@/components/MeetingWidget";
+import { AuthHandler } from "@/components/AuthHandler";
 const inter = Inter({ subsets: ["latin"] });
 
 const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://freewebdev.se";
@@ -54,7 +55,11 @@ export default function RootLayout({
         <body className={inter.className}>
           <Providers>
             <Header />
-            <main className="min-h-screen">{children}</main>
+            <main className="min-h-screen">
+              <AuthHandler />
+              {children}
+              {/* <MeetingWidget /> */}
+            </main>
             <Footer />
             <ClientWidgets />
           </Providers>

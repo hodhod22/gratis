@@ -12,6 +12,8 @@ import {
 } from "react-icons/fi";
 import Link from "next/link";
 import TypingAnimation from "./TypingAnimation";
+import KontaktaMig from "./KontaktaMig";
+import CVButton from './CVButton';
 
 export default function Hero() {
   const [scrolled, setScrolled] = useState(false);
@@ -89,37 +91,37 @@ export default function Hero() {
               </button>
             </Link>
             <Link href="#contact">
-              <button className="w-full sm:w-auto px-8 py-4 border-2 border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300 flex items-center justify-center gap-2 hover:scale-105">
+              <div
+                style={{ color: "bold" }}
+                className="w-full sm:w-auto px-8 py-4 border-2 border-slate-300  dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all  duration-300 flex items-center justify-center gap-2 hover:scale-105"
+              >
                 <FiMail />
-                <span>Kontakta mig</span>
-              </button>
+                <KontaktaMig />
+              </div>
             </Link>
           </div>
 
           {/* Quick action buttons */}
           <div className="flex flex-wrap gap-3 justify-center mb-12">
             <Link href="/donate">
-              <button className="px-4 py-2 text-sm bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-full transition-colors flex items-center gap-1">
+              <button className="px-4 py-3 text-sm bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded transition-colors flex items-center gap-1">
                 <FiHeart className="w-3 h-3" />
                 Donera frivilligt
               </button>
             </Link>
-            <Link href="/booking">
-              <button className="px-4 py-2 text-sm bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full transition-colors flex items-center gap-1">
+            <Link href="/book-meeting">
+              <button className="px-6 py-3 text-sm bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded transition-colors flex items-center gap-1">
                 <FiCalendar className="w-3 h-3" />
                 Boka möte
               </button>
             </Link>
-            <button className="px-4 py-2 text-sm bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 rounded-full transition-colors flex items-center gap-1">
-              <FiDownload className="w-3 h-3" />
-              Ladda ner CV
-            </button>
+            <CVButton />
           </div>
 
           {/* Social Links med tooltip effekt */}
           <div className="flex justify-center gap-8">
             <a
-              href="https://github.com/dittanvandarnamn"
+              href="https://github.com/hodhod22"
               target="_blank"
               rel="noopener noreferrer"
               className="group relative text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 hover:scale-110"
@@ -130,7 +132,7 @@ export default function Hero() {
               </span>
             </a>
             <a
-              href="https://linkedin.com/in/dittnamn"
+              href="https://linkedin.com/in/ali-utvecklare-966349404"
               target="_blank"
               rel="noopener noreferrer"
               className="group relative text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 hover:scale-110"
@@ -140,15 +142,7 @@ export default function Hero() {
                 LinkedIn
               </span>
             </a>
-            <a
-              href="mailto:din@email.se"
-              className="group relative text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 hover:scale-110"
-            >
-              <FiMail className="w-7 h-7" />
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs bg-slate-800 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                Mail
-              </span>
-            </a>
+           
           </div>
 
           {/* Scroll indicator */}

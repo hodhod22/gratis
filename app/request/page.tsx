@@ -10,6 +10,8 @@ import {
   FiAlertCircle,
   FiCreditCard,
   FiPhone,
+  FiCopy,
+  FiExternalLink,
 } from "react-icons/fi";
 import WaitingTime from "@/components/WaitingTime";
 
@@ -27,6 +29,10 @@ export default function RequestPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // State för kopieringsfeedback
+  const [copiedSwish, setCopiedSwish] = useState(false);
+  const [copiedRevolut, setCopiedRevolut] = useState(false);
 
   const submitRequest = useMutation(api.requests.submitRequest);
 
@@ -57,6 +63,36 @@ export default function RequestPage() {
 
   const handleDonation = () => {
     window.location.href = "/donate";
+  };
+
+  // Kopiera Swish nummer
+  const copySwishNumber = async () => {
+    const swishNumber = "0722972894";
+    try {
+      await navigator.clipboard.writeText(swishNumber);
+      setCopiedSwish(true);
+      setTimeout(() => setCopiedSwish(false), 2000);
+    } catch (err) {
+      console.error("Kunde inte kopiera:", err);
+    }
+  };
+
+  // Kopiera Revolut användarnamn
+  const copyRevolutUsername = async () => {
+    const revolutUsername = "@aezadkhaha";
+    try {
+      await navigator.clipboard.writeText(revolutUsername);
+      setCopiedRevolut(true);
+      setTimeout(() => setCopiedRevolut(false), 2000);
+    } catch (err) {
+      console.error("Kunde inte kopiera:", err);
+    }
+  };
+
+  // Öppna Revolut betalningslänk
+  const openRevolut = () => {
+    // Revolut paylink (ersätt med din faktiska Revolut paylink)
+    window.open("https://revolut.me/aezadkhaha", "_blank");
   };
 
   if (isSubmitted) {
@@ -126,9 +162,7 @@ export default function RequestPage() {
         </div>
       </div>
 
-      {/* ================================================ */}
-      {/* HÄR SKA <WaitingTime /> LIGGA - Under info cards, ovanför formuläret */}
-      {/* ================================================ */}
+      {/* Waiting Time */}
       <div className="mb-8">
         <WaitingTime />
       </div>
@@ -287,7 +321,7 @@ export default function RequestPage() {
         </p>
       </form>
 
-      {/* Donation Section */}
+      {/* Donation Section - Uppdaterad med Revolut */}
       <div className="mt-12">
         <div className="bg-linear-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 rounded-2xl p-6 md:p-8">
           <div className="text-center mb-6">
@@ -303,7 +337,7 @@ export default function RequestPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 max-w-3xl mx-auto">
             {/* Stripe / Kortbetalning */}
             <div className="bg-white dark:bg-slate-800 rounded-xl p-6 text-center shadow-lg">
               <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full mb-4">
@@ -322,7 +356,7 @@ export default function RequestPage() {
               </button>
             </div>
 
-            {/* Swish */}
+            {/* Swish - Med kopiering */}
             <div className="bg-white dark:bg-slate-800 rounded-xl p-6 text-center shadow-lg border-2 border-green-500">
               <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full mb-4">
                 <FiPhone className="w-6 h-6 text-green-600" />
@@ -331,13 +365,68 @@ export default function RequestPage() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
                 Swisha valfritt belopp till:
               </p>
-              <div className="bg-green-50 dark:bg-green-950/50 p-3 rounded-lg mb-4">
-                <p className="text-2xl font-mono font-bold text-green-700 dark:text-green-400">
-                  123 456 78 90
-                </p>
+              <div className="bg-green-50 dark:bg-green-950/50 p-3 rounded-lg mb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-2xl font-mono font-bold text-green-700 dark:text-green-400">
+                    0722972894
+                  </p>
+                  <button
+                    onClick={copySwishNumber}
+                    className="flex items-center gap-1 px-2 py-1 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    <FiCopy className="w-3 h-3" />
+                    {copiedSwish ? "Kopierat!" : "Kopiera"}
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-slate-500">
+              {copiedSwish && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center justify-center gap-1">
+                  <FiCheck className="w-3 h-3" /> Swish-numret är kopierat!
+                </p>
+              )}
+              <p className="text-xs text-slate-500 mt-2">
                 💡 Swisha valfritt belopp. Skriv "Donation" i meddelandet.
+              </p>
+            </div>
+
+            {/* Revolut - Med kopiering och länk */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 text-center shadow-lg border-2 border-purple-500">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full mb-4">
+                <FiSend className="w-6 h-6 text-purple-600" />
+              </div>
+              <h3 className="font-semibold mb-2">Donera via Revolut</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                Skicka via Revolut till:
+              </p>
+              <div className="bg-purple-50 dark:bg-purple-950/50 p-3 rounded-lg mb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xl font-mono font-bold text-purple-700 dark:text-purple-400">
+                    @aezadkhaha
+                  </p>
+                  <button
+                    onClick={copyRevolutUsername}
+                    className="flex items-center gap-1 px-2 py-1 bg-purple-500 text-white text-sm rounded-lg hover:bg-purple-600 transition-colors"
+                  >
+                    <FiCopy className="w-3 h-3" />
+                    {copiedRevolut ? "Kopierat!" : "Kopiera"}
+                  </button>
+                </div>
+              </div>
+              {copiedRevolut && (
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 flex items-center justify-center gap-1">
+                  <FiCheck className="w-3 h-3" /> Revolut-användarnamnet är
+                  kopierat!
+                </p>
+              )}
+              <button
+                onClick={openRevolut}
+                className="w-full mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <FiExternalLink className="w-4 h-4" />
+                Öppna Revolut
+              </button>
+              <p className="text-xs text-slate-500 mt-2">
+                💡 Klicka för att öppna Revolut eller kopiera användarnamnet.
               </p>
             </div>
           </div>

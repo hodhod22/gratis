@@ -20,7 +20,7 @@ const projects = [
     category: "webapp",
     imageUrl:
       "https://images.unsplash.com/photo-1545235617-7a424c1a60e1?w=600&h=400&fit=crop",
-    githubUrl: "https://github.com/dittanvandarnamn/ai-image-generator",
+    githubUrl: "https://github.com/hodhod212/ai-image-generator",
     liveUrl: "https://ai-image-generator-demo.vercel.app",
     featured: true,
   },
@@ -41,7 +41,7 @@ const projects = [
     category: "webapp",
     imageUrl:
       "https://images.unsplash.com/photo-1592210454359-9043ad067b6b?w=600&h=400&fit=crop",
-    githubUrl: "https://github.com/dittanvandarnamn/weather-dashboard",
+    githubUrl: "https://github.com/hodhod22/weather-dashboard",
     liveUrl: "https://weather-dashboard-demo.vercel.app",
     featured: true,
   },
@@ -62,7 +62,7 @@ const projects = [
     category: "api",
     imageUrl:
       "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&h=400&fit=crop",
-    githubUrl: "https://github.com/dittanvandarnamn/task-management-api",
+    githubUrl: "https://github.com/hodhod22/task-management-api",
     liveUrl: "https://task-api-demo.herokuapp.com/api-docs",
     featured: false,
   },
@@ -83,8 +83,8 @@ const projects = [
     category: "webapp",
     imageUrl:
       "https://images.unsplash.com/photo-1517292987719-0369a794ec0f?w=600&h=400&fit=crop",
-    githubUrl: "https://github.com/dittanvandarnamn/portfolio-2024",
-    liveUrl: "https://dittanvandarnamn.dev",
+    githubUrl: "https://github.com/hodhod22/portfolio-2024",
+    liveUrl: "https://hodhod22.dev",
     featured: true,
   },
   {
@@ -105,7 +105,7 @@ const projects = [
     category: "api",
     imageUrl:
       "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&h=400&fit=crop",
-    githubUrl: "https://github.com/dittanvandarnamn/ecommerce-backend",
+    githubUrl: "https://github.com/hodhod22/ecommerce-backend",
     liveUrl: "https://ecommerce-api-demo.herokuapp.com",
     featured: false,
   },
@@ -127,7 +127,7 @@ const projects = [
     category: "webapp",
     imageUrl:
       "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=600&h=400&fit=crop",
-    githubUrl: "https://github.com/dittanvandarnamn/realtime-chat",
+    githubUrl: "https://github.com/hodhod22/realtime-chat",
     liveUrl: "https://chat-demo.vercel.app",
     featured: false,
   },

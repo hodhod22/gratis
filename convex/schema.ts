@@ -1,3 +1,4 @@
+// convex/schema.ts
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
@@ -30,7 +31,6 @@ export default defineSchema({
   }),
 
   // messages tabell med Convex Storage support
-  // messages tabell - attachments utan url (hämtas via getImageUrl)
   messages: defineTable({
     name: v.string(),
     email: v.string(),
@@ -59,9 +59,7 @@ export default defineSchema({
     lastMessageAt: v.number(),
     unreadCount: v.number(),
     adminClosedAt: v.optional(v.number()),
-    /** Senaste gången kunden var inloggad/chatt öppen (för admin-notis). */
     lastCustomerPingAt: v.optional(v.number()),
-    /** Olästa meddelanden från admin (kundens vy). */
     customerUnreadCount: v.optional(v.number()),
   })
     .index("by_email", ["email"])
@@ -107,4 +105,38 @@ export default defineSchema({
     count: v.number(),
     windowStart: v.number(),
   }).index("by_key", ["key"]),
+
+  // 🆕 NEW: Users table for admin management
+  users: defineTable({
+    tokenIdentifier: v.string(),
+    email: v.string(),
+    name: v.string(),
+    isAdmin: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_token", ["tokenIdentifier"])
+    .index("by_email", ["email"]),
+  // Lägg till i din convex/schema.ts
+
+ // convex/schema.ts - Lägg till adminNotes i meetings
+
+meetings: defineTable({
+  name: v.string(),
+  email: v.string(),
+  phone: v.optional(v.string()),
+  date: v.string(),
+  time: v.string(),
+  meetingType: v.string(),
+  message: v.optional(v.string()),
+  status: v.string(), // pending, confirmed, completed, cancelled
+  meetingLink: v.optional(v.string()),
+  adminNotes: v.optional(v.string()), // 🆕 Lägg till denna rad
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_email", ["email"])
+  .index("by_status", ["status"])
+  .index("by_date", ["date"])
+  .index("by_createdAt", ["createdAt"]),
 });

@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+/* import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import AdminClient from "./AdminClient";
 
@@ -41,4 +41,48 @@ export default async function AdminPage() {
   }
 
   return <AdminClient adminEmail={ADMIN_EMAIL} />;
+}
+ */
+// app/admin/page.tsx
+'use client';
+
+import { useAuth } from "@clerk/nextjs";
+import { useIsAdmin } from "@/lib/adminCheck";
+import AdminClient from "./AdminClient";
+
+export default function AdminPage() {
+  const { isLoaded: authLoaded, userId } = useAuth();
+  const isAdmin = useIsAdmin();
+
+  if (!authLoaded) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center p-8">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-red-600">Inte inloggad</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center p-8">
+          <div className="text-6xl mb-4">⛔</div>
+          <h2 className="text-2xl font-bold text-red-600">Åtkomst nekad</h2>
+        </div>
+      </div>
+    );
+  }
+
+  return <AdminClient />;
 }

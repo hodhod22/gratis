@@ -36,7 +36,7 @@ export default function DownloadCVButton() {
       <button
         onClick={generatePDF}
         disabled={isGenerating}
-        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2"
+        className="px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2"
       >
         {isGenerating ? (
           <>

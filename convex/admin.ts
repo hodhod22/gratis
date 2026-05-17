@@ -1,3 +1,4 @@
+// convex/admin.ts
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
@@ -12,6 +13,7 @@ export const getAllConversations = query({
       .query("conversations")
       .order("desc")
       .collect();
+
     const result = [];
     for (const conv of conversations) {
       const messages = await ctx.db
@@ -19,6 +21,7 @@ export const getAllConversations = query({
         .filter((q) => q.eq(q.field("email"), conv.email))
         .order("desc")
         .take(1);
+
       result.push({
         ...conv,
         lastMessage: messages[0]?.message || "",
@@ -37,6 +40,7 @@ export const getActiveConversations = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .order("desc")
       .collect();
+
     const result = [];
     for (const conv of conversations) {
       const messages = await ctx.db
@@ -44,6 +48,7 @@ export const getActiveConversations = query({
         .filter((q) => q.eq(q.field("email"), conv.email))
         .order("desc")
         .take(1);
+
       result.push({
         ...conv,
         lastMessage: messages[0]?.message || "",
@@ -62,6 +67,7 @@ export const getClosedConversations = query({
       .filter((q) => q.eq(q.field("isActive"), false))
       .order("desc")
       .collect();
+
     const result = [];
     for (const conv of conversations) {
       const messages = await ctx.db
@@ -69,12 +75,34 @@ export const getClosedConversations = query({
         .filter((q) => q.eq(q.field("email"), conv.email))
         .order("desc")
         .take(1);
+
       result.push({
         ...conv,
         lastMessage: messages[0]?.message || "",
       });
     }
     return result;
+  },
+});
+
+// Hämta konversation via ID
+export const getConversationById = query({
+  args: { id: v.id("conversations") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return await ctx.db.get(args.id);
+  },
+});
+
+// Hämta konversation via email
+export const getConversationByEmail = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return await ctx.db
+      .query("conversations")
+      .filter((q) => q.eq(q.field("email"), args.email))
+      .first();
   },
 });
 
@@ -92,6 +120,7 @@ export const openConversation = mutation({
       await ctx.db.patch(existing._id, {
         isActive: true,
         unreadCount: 0,
+        adminClosedAt: undefined,
       });
     } else {
       const messages = await ctx.db
@@ -218,6 +247,26 @@ export const fixOldMessages = mutation({
   },
 });
 
+// Rensa bort tomma konversationer
+export const cleanOldConversations = mutation({
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const conversations = await ctx.db.query("conversations").collect();
+    let deleted = 0;
+    for (const conv of conversations) {
+      const messages = await ctx.db
+        .query("messages")
+        .filter((q) => q.eq(q.field("email"), conv.email))
+        .collect();
+      if (messages.length === 0) {
+        await ctx.db.delete(conv._id);
+        deleted++;
+      }
+    }
+    return { deleted };
+  },
+});
+
 // ============ FÖRFRÅGNINGAR ============
 
 // Hämta alla förfrågningar
@@ -225,6 +274,15 @@ export const getAllRequests = query({
   handler: async (ctx) => {
     await requireAdmin(ctx);
     return await ctx.db.query("requests").order("desc").collect();
+  },
+});
+
+// Hämta förfrågan via ID
+export const getRequestById = query({
+  args: { id: v.id("requests") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return await ctx.db.get(args.id);
   },
 });
 
@@ -238,6 +296,34 @@ export const getRequestsByStatus = query({
       .filter((q) => q.eq(q.field("status"), args.status))
       .order("desc")
       .collect();
+  },
+});
+
+// Hämta förfrågningar sorterade efter prioritet
+export const getRequestsByPriority = query({
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const requests = await ctx.db.query("requests").order("desc").collect();
+    return requests.sort((a, b) => b.priority - a.priority);
+  },
+});
+
+// Hämta statistik för förfrågningar
+export const getRequestsStats = query({
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const allRequests = await ctx.db.query("requests").collect();
+
+    return {
+      total: allRequests.length,
+      pending: allRequests.filter((r) => r.status === "pending").length,
+      inProgress: allRequests.filter((r) => r.status === "in-progress").length,
+      completed: allRequests.filter((r) => r.status === "completed").length,
+      rejected: allRequests.filter((r) => r.status === "rejected").length,
+      averagePriority:
+        allRequests.reduce((sum, r) => sum + r.priority, 0) /
+        (allRequests.length || 1),
+    };
   },
 });
 
@@ -275,6 +361,73 @@ export const updateRequestPriority = mutation({
   },
 });
 
+// Lägg till kommentar på en förfrågan
+export const addRequestComment = mutation({
+  args: {
+    id: v.id("requests"),
+    comment: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const request = await ctx.db.get(args.id);
+    const existingComments = request?.adminNotes || "";
+    const timestamp = new Date().toLocaleString("sv-SE");
+    const newComment = `[${timestamp}] ${args.comment}\n${existingComments}`;
+
+    await ctx.db.patch(args.id, {
+      adminNotes: newComment,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// Bulk uppdatering av status (för flera förfrågningar)
+export const bulkUpdateRequestStatus = mutation({
+  args: {
+    ids: v.array(v.id("requests")),
+    status: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    let count = 0;
+    for (const id of args.ids) {
+      await ctx.db.patch(id, {
+        status: args.status,
+        updatedAt: Date.now(),
+      });
+      count++;
+    }
+    return { success: true, count };
+  },
+});
+
+// Arkivera gamla färdiga förfrågningar
+export const archiveOldCompleted = mutation({
+  args: {
+    olderThanDays: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const cutoffDate = Date.now() - args.olderThanDays * 24 * 60 * 60 * 1000;
+    const completedRequests = await ctx.db
+      .query("requests")
+      .filter((q) => q.eq(q.field("status"), "completed"))
+      .collect();
+
+    const toArchive = completedRequests.filter((r) => r.updatedAt < cutoffDate);
+    let archived = 0;
+    for (const req of toArchive) {
+      await ctx.db.patch(req._id, {
+        status: "archived",
+        updatedAt: Date.now(),
+      });
+      archived++;
+    }
+
+    return { archived };
+  },
+});
+
 // Ta bort en förfrågan
 export const deleteRequest = mutation({
   args: { id: v.id("requests") },
@@ -283,21 +436,44 @@ export const deleteRequest = mutation({
     await ctx.db.delete(args.id);
   },
 });
-export const cleanOldConversations = mutation({
+
+// ============ STATISTIK / DASHBOARD ============
+
+// Hämta statistik för admin dashboard
+export const getAdminStats = query({
   handler: async (ctx) => {
     await requireAdmin(ctx);
-    const conversations = await ctx.db.query("conversations").collect();
-    let deleted = 0;
-    for (const conv of conversations) {
-      const messages = await ctx.db
-        .query("messages")
-        .filter((q) => q.eq(q.field("email"), conv.email))
-        .collect();
-      if (messages.length === 0) {
-        await ctx.db.delete(conv._id);
-        deleted++;
-      }
-    }
-    return { deleted };
+
+    const activeConversations = await ctx.db
+      .query("conversations")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    const unreadMessages = await ctx.db
+      .query("messages")
+      .filter((q) => q.eq(q.field("isRead"), false))
+      .filter((q) => q.eq(q.field("isFromAdmin"), false))
+      .collect();
+
+    const pendingRequests = await ctx.db
+      .query("requests")
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .collect();
+
+    const totalDonations = await ctx.db.query("donations").collect();
+    const totalAmount = totalDonations.reduce((sum, d) => sum + d.amount, 0);
+
+    return {
+      activeConversations: activeConversations.length,
+      closedConversations: await ctx.db
+        .query("conversations")
+        .filter((q) => q.eq(q.field("isActive"), false))
+        .collect()
+        .then((c) => c.length),
+      unreadMessages: unreadMessages.length,
+      pendingRequests: pendingRequests.length,
+      totalDonations: totalDonations.length,
+      totalAmount: totalAmount,
+    };
   },
 });

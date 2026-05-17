@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as adminSetup from "../adminSetup.js";
 import type * as adminStatus from "../adminStatus.js";
 import type * as blog from "../blog.js";
 import type * as chat from "../chat.js";
@@ -18,6 +19,7 @@ import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
+import type * as meetings from "../meetings.js";
 import type * as projects from "../projects.js";
 import type * as requests from "../requests.js";
 import type * as sendEmail from "../sendEmail.js";
@@ -31,6 +33,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  adminSetup: typeof adminSetup;
   adminStatus: typeof adminStatus;
   blog: typeof blog;
   chat: typeof chat;
@@ -40,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/rateLimit": typeof lib_rateLimit;
+  meetings: typeof meetings;
   projects: typeof projects;
   requests: typeof requests;
   sendEmail: typeof sendEmail;

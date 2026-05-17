@@ -13,6 +13,7 @@
   "dependencies": {
     "@clerk/nextjs": "^7.3.4",
     "@convex-dev/resend": "^0.2.3",
+    "@esbuild/win32-x64": "^0.28.0",
     "@heroicons/react": "^2.2.0",
     "@stripe/react-stripe-js": "^6.3.0",
     "@stripe/stripe-js": "^9.5.0",
