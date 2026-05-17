@@ -1,15 +1,66 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin, requireAuth, requireUserOrAdmin } from "./lib/auth";
+import { enforceRateLimit } from "./lib/rateLimit";
+
+export const generateUploadUrl = mutation({
+  handler: async (ctx) => {
+    await requireAuth(ctx);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const getImageUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    try {
+      return await ctx.storage.getUrl(args.storageId);
+    } catch {
+      return null;
+    }
+  },
+});
 
 export const getMessagesByEmail = query({
   args: { email: v.string() },
   handler: async (ctx, args) => {
+    await requireUserOrAdmin(ctx, args.email);
+    const email = args.email.toLowerCase();
     const messages = await ctx.db
       .query("messages")
-      .filter((q) => q.eq(q.field("email"), args.email))
-      .order("asc")
+      .withIndex("by_email", (q) => q.eq("email", email))
       .collect();
-    return messages;
+    return messages.sort((a, b) => a.createdAt - b.createdAt);
+  },
+});
+
+export const getCustomerUnreadCount = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    await requireUserOrAdmin(ctx, args.email);
+    const conv = await ctx.db
+      .query("conversations")
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .first();
+    return conv?.customerUnreadCount ?? 0;
+  },
+});
+
+export const markCustomerMessagesRead = mutation({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const authEmail = await requireAuth(ctx);
+    if (authEmail !== args.email.toLowerCase()) {
+      throw new Error("Du får bara markera din egen chatt som läst");
+    }
+    const conv = await ctx.db
+      .query("conversations")
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .first();
+    if (conv) {
+      await ctx.db.patch(conv._id, { customerUnreadCount: 0 });
+    }
   },
 });
 
@@ -18,15 +69,31 @@ export const sendMessage = mutation({
     name: v.string(),
     email: v.string(),
     message: v.string(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          storageId: v.id("_storage"),
+          size: v.number(),
+          type: v.string(),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
-    console.log("💬 Nytt meddelande från:", args.name, "(", args.email, ")");
-    console.log("💬 Meddelande:", args.message);
+    const authEmail = await requireAuth(ctx);
+    const email = args.email.toLowerCase();
+    if (authEmail !== email) {
+      throw new Error("E-post måste matcha ditt inloggade konto");
+    }
+
+    await enforceRateLimit(ctx, `chat:${email}`, 30);
 
     await ctx.db.insert("messages", {
       name: args.name,
-      email: args.email,
+      email,
       message: args.message,
+      attachments: args.attachments || [],
       isRead: false,
       isFromAdmin: false,
       createdAt: Date.now(),
@@ -34,7 +101,7 @@ export const sendMessage = mutation({
 
     const existingConv = await ctx.db
       .query("conversations")
-      .filter((q) => q.eq(q.field("email"), args.email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (existingConv) {
@@ -42,18 +109,62 @@ export const sendMessage = mutation({
         lastMessageAt: Date.now(),
         unreadCount: (existingConv.unreadCount || 0) + 1,
         isActive: true,
+        name: args.name,
       });
     } else {
       await ctx.db.insert("conversations", {
-        email: args.email,
+        email,
         name: args.name,
         isActive: true,
         lastMessageAt: Date.now(),
         unreadCount: 1,
+        customerUnreadCount: 0,
       });
     }
 
+    await ctx.scheduler.runAfter(0, internal.emails.notifyAdminNewChatMessage, {
+      name: args.name,
+      email,
+      message: args.message || "📎 Bilaga",
+    });
+
     return { success: true };
+  },
+});
+
+export const recordCustomerOnline = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const authEmail = await requireAuth(ctx);
+    const email = args.email.toLowerCase();
+    if (authEmail !== email) {
+      throw new Error("Ogiltig e-post");
+    }
+
+    await enforceRateLimit(ctx, `ping:${email}`, 20);
+
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("conversations")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { lastCustomerPingAt: now });
+    } else {
+      await ctx.db.insert("conversations", {
+        email,
+        name: args.name,
+        isActive: true,
+        lastMessageAt: now,
+        unreadCount: 0,
+        lastCustomerPingAt: now,
+        customerUnreadCount: 0,
+      });
+    }
   },
 });
 
@@ -62,12 +173,26 @@ export const sendAdminReply = mutation({
     toEmail: v.string(),
     toName: v.string(),
     message: v.string(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          storageId: v.id("_storage"),
+          size: v.number(),
+          type: v.string(),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const toEmail = args.toEmail.toLowerCase();
+
     await ctx.db.insert("messages", {
       name: "Admin",
-      email: args.toEmail,
+      email: toEmail,
       message: args.message,
+      attachments: args.attachments || [],
       isRead: true,
       isFromAdmin: true,
       createdAt: Date.now(),
@@ -75,7 +200,7 @@ export const sendAdminReply = mutation({
 
     const conv = await ctx.db
       .query("conversations")
-      .filter((q) => q.eq(q.field("email"), args.toEmail))
+      .withIndex("by_email", (q) => q.eq("email", toEmail))
       .first();
 
     if (conv) {
@@ -83,6 +208,7 @@ export const sendAdminReply = mutation({
         lastMessageAt: Date.now(),
         unreadCount: 0,
         isActive: true,
+        customerUnreadCount: (conv.customerUnreadCount ?? 0) + 1,
       });
     }
 

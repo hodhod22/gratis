@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./lib/auth";
 
 // Hämta alla publicerade blogginlägg
 export const getAllPublished = query({
@@ -17,15 +18,11 @@ export const getAllPublished = query({
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, args) => {
-    console.log("🔍 Söker efter blogg med slug:", args.slug);
-    const allBlogs = await ctx.db.query("blogs").collect();
-    console.log(
-      "📚 Alla bloggar:",
-      allBlogs.map((b) => ({ title: b.title, slug: b.slug })),
-    );
-    const blog = allBlogs.find((b) => b.slug === args.slug);
-    console.log("✅ Hittad blogg:", blog?.title);
-    return blog;
+    const blog = await ctx.db
+      .query("blogs")
+      .filter((q) => q.eq(q.field("slug"), args.slug))
+      .first();
+    return blog ?? null;
   },
 });
 
@@ -41,6 +38,7 @@ export const createBlog = mutation({
     tags: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     const now = Date.now();
     const readTime = Math.ceil(args.content.split(" ").length / 200);
 
@@ -66,6 +64,7 @@ export const updateBlog = mutation({
     isPublished: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     const { id, ...fields } = args;
     await ctx.db.patch(id, fields);
   },
@@ -75,6 +74,7 @@ export const updateBlog = mutation({
 export const deleteBlog = mutation({
   args: { id: v.id("blogs") },
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     await ctx.db.delete(args.id);
   },
 });

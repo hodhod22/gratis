@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { mutation } from "./_generated/server";
+import { enforceRateLimit } from "./lib/rateLimit";
 
-// Skicka in en ny förfrågan
 export const submitRequest = mutation({
   args: {
     name: v.string(),
@@ -13,75 +14,31 @@ export const submitRequest = mutation({
     budget: v.string(),
   },
   handler: async (ctx, args) => {
+    const email = args.email.toLowerCase().trim();
+    if (!email.includes("@")) {
+      throw new Error("Ogiltig e-postadress");
+    }
+
+    await enforceRateLimit(ctx, `request:${email}`, 3);
+
     const now = Date.now();
 
     await ctx.db.insert("requests", {
       ...args,
+      email,
       status: "pending",
       priority: 3,
       createdAt: now,
       updatedAt: now,
     });
 
+    await ctx.scheduler.runAfter(0, internal.emails.notifyAdminNewRequest, {
+      name: args.name,
+      email,
+      websiteType: args.websiteType,
+      description: args.description,
+    });
+
     return { success: true };
-  },
-});
-
-// Admin: Hämta alla förfrågningar
-export const getAllRequests = query({
-  handler: async (ctx) => {
-    return await ctx.db.query("requests").order("desc").collect();
-  },
-});
-
-// Admin: Hämta förfrågningar efter status
-export const getRequestsByStatus = query({
-  args: { status: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("requests")
-      .withIndex("by_status", (q) => q.eq("status", args.status))
-      .order("desc")
-      .collect();
-  },
-});
-
-// Admin: Uppdatera status på en förfrågan
-export const updateRequestStatus = mutation({
-  args: {
-    id: v.id("requests"),
-    status: v.string(),
-    adminNotes: v.optional(v.string()),
-    completedUrl: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, {
-      status: args.status,
-      adminNotes: args.adminNotes,
-      completedUrl: args.completedUrl,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-// Admin: Uppdatera prioritet
-export const updatePriority = mutation({
-  args: {
-    id: v.id("requests"),
-    priority: v.number(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, {
-      priority: args.priority,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-// Admin: Ta bort förfrågan
-export const deleteRequest = mutation({
-  args: { id: v.id("requests") },
-  handler: async (ctx, args) => {
-    await ctx.db.delete(args.id);
   },
 });

@@ -25,28 +25,13 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
   const { isSignedIn, user } = useUser();
 
-  const unreadCount = useQuery(api.admin.getUnreadCount) || 0;
-
   const ADMIN_EMAIL =
     process.env.NEXT_PUBLIC_ADMIN_EMAIL || "ezadkhahaali@gmail.com";
   const userEmail = user?.primaryEmailAddress?.emailAddress;
   const isAdmin = userEmail === ADMIN_EMAIL;
 
-  useEffect(() => {
-    const updateAdminStatus = async () => {
-      try {
-        await fetch("/api/admin-status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isOnline: isSignedIn && isAdmin }),
-        });
-      } catch (error) {
-        console.error("Failed to update admin status:", error);
-      }
-    };
-
-    updateAdminStatus();
-  }, [isSignedIn, isAdmin]);
+  const unreadCount =
+    useQuery(api.admin.getUnreadCount, isAdmin ? {} : "skip") ?? 0;
 
   useEffect(() => {
     setMounted(true);

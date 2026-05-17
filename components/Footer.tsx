@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FiHeart } from "react-icons/fi";
 
 export default function Footer() {
@@ -7,8 +8,16 @@ export default function Footer() {
         <p className="flex items-center justify-center gap-1">
           Byggt med Next.js, TypeScript & Convex
         </p>
+        <p className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <Link href="/integritet" className="hover:text-blue-600 underline">
+            Integritetspolicy
+          </Link>
+          <Link href="/request" className="hover:text-blue-600 underline">
+            Begär gratis hemsida
+          </Link>
+        </p>
         <p className="mt-2 flex items-center justify-center gap-1">
-          © {new Date().getFullYear()} Din Portfolio | Gjort med{" "}
+          © {new Date().getFullYear()} FreeWebDev | Gjort med{" "}
           <FiHeart className="text-red-500 w-3 h-3" /> för modern webbutveckling
         </p>
       </div>

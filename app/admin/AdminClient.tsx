@@ -1,34 +1,33 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Doc, Id } from "@/convex/_generated/dataModel";
+import { Id } from "@/convex/_generated/dataModel";
+import Attachment from "@/components/chat/Attachment";
+import { useChatFileUpload } from "@/components/chat/useChatFileUpload";
+import { notifyChatEvent } from "@/lib/notifications";
+import NotificationEnableBanner from "@/components/NotificationEnableBanner";
 import {
-  FiMail,
-  FiCheck,
   FiTrash2,
   FiMessageSquare,
-  FiUser,
   FiAtSign,
   FiSend,
   FiBell,
   FiClock,
   FiUsers,
-  FiMinimize2,
   FiX,
   FiArchive,
-  FiRefreshCw,
   FiInbox,
   FiHeart,
-  FiStar,
-  FiBarChart2,
-  FiAlertCircle,
   FiCalendar,
   FiFlag,
   FiEdit,
-  FiPlus,
   FiSave,
+  FiPaperclip,
+  FiImage,
+  FiFile,
+  FiEye,
 } from "react-icons/fi";
 
 interface Conversation {
@@ -39,7 +38,10 @@ interface Conversation {
   lastMessageAt: number;
   unreadCount: number;
   lastMessage?: string;
+  lastCustomerPingAt?: number;
 }
+
+const NOTIFY_COOLDOWN_MS = 15 * 60 * 1000;
 
 interface Request {
   _id: string;
@@ -66,6 +68,8 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "active" | "closed" | "requests" | "blog"
@@ -76,13 +80,15 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     [key: string]: number;
   }>({});
   const [notificationSound] = useState(true);
-  const [lastUnreadCount, setLastUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Spåra vilka konversationer som redan spelat ljud för admin (15 minuters cooldown)
-  const [playedSounds, setPlayedSounds] = useState<Map<string, number>>(
-    new Map(),
-  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const convSnapshotRef = useRef<
+    Map<string, { ping: number; unread: number }>
+  >(new Map());
+  const convSnapshotReady = useRef(false);
+  const selectConversationRef = useRef<
+    (conv: Conversation) => Promise<void>
+  >(async () => {});
 
   // Blogg state
   const [editingBlog, setEditingBlog] = useState<any>(null);
@@ -116,6 +122,7 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
   const markMessagesAsRead = useMutation(api.admin.markMessagesAsRead);
   const sendReply = useMutation(api.chat.sendAdminReply);
   const deleteMessage = useMutation(api.admin.deleteMessage);
+  const { uploadFiles } = useChatFileUpload();
 
   // Mutationer för förfrågningar
   const updateRequestStatus = useMutation(api.admin.updateRequestStatus);
@@ -154,13 +161,15 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
   );
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
 
- useEffect(() => {
-   if (totalUnread > 0) {
-     document.title = `(${totalUnread}) Admin Panel - FreeWebDev`;
-   } else {
-     document.title = "Admin Panel - FreeWebDev";
-   }
- }, [totalUnread]);
+  useEffect(() => {
+    if (totalUnread > 0) {
+      document.title = `(${totalUnread}) Admin Panel - FreeWebDev`;
+    } else {
+      document.title = "Admin Panel - FreeWebDev";
+    }
+  }, [totalUnread]);
+
+  const notifyCooldownRef = useRef<Map<string, number>>(new Map());
 
   // Simulera progress för pågående projekt
   useEffect(() => {
@@ -222,6 +231,80 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
       conv.unreadCount = 0;
     }
   };
+  selectConversationRef.current = handleSelectConversation;
+
+  const tryNotifyAdmin = useCallback(
+    (conv: Conversation, reason: "login" | "message") => {
+      if (!notificationSound) return;
+      const now = Date.now();
+      const last = notifyCooldownRef.current.get(conv.email) ?? 0;
+      if (now - last < NOTIFY_COOLDOWN_MS) return;
+
+      const isViewingThisChat =
+        selectedConversation?.email === conv.email && activeTab === "active";
+
+      notifyChatEvent({
+        soundVolume: 0.45,
+        skipDesktop: isViewingThisChat && document.hasFocus(),
+        desktop: {
+          title:
+            reason === "login"
+              ? `${conv.name} är inloggad`
+              : `Nytt meddelande från ${conv.name}`,
+          body:
+            reason === "login"
+              ? "En kund har loggat in på portfolion"
+              : (conv.lastMessage || "Öppna admin-panelen för att läsa").slice(
+                  0,
+                  140,
+                ),
+          tag: `admin-${conv.email}-${reason}`,
+          onClick: () => {
+            setActiveTab("active");
+            void selectConversationRef.current(conv);
+          },
+        },
+      });
+
+      notifyCooldownRef.current.set(conv.email, now);
+    },
+    [notificationSound, selectedConversation?.email, activeTab],
+  );
+
+  // Ljud + desktop när kund loggar in eller skickar meddelande (max 1 / 15 min per kund)
+  useEffect(() => {
+    if (!activeConversations.length) return;
+
+    if (!convSnapshotReady.current) {
+      for (const conv of activeConversations) {
+        convSnapshotRef.current.set(conv.email, {
+          ping: conv.lastCustomerPingAt ?? 0,
+          unread: conv.unreadCount ?? 0,
+        });
+      }
+      convSnapshotReady.current = true;
+      return;
+    }
+
+    for (const conv of activeConversations) {
+      const prev = convSnapshotRef.current.get(conv.email) ?? {
+        ping: 0,
+        unread: 0,
+      };
+      const ping = conv.lastCustomerPingAt ?? 0;
+      const unread = conv.unreadCount ?? 0;
+      const customerLoggedIn = ping > prev.ping;
+      const newCustomerMessage = unread > prev.unread;
+
+      if (newCustomerMessage) {
+        tryNotifyAdmin(conv, "message");
+      } else if (customerLoggedIn) {
+        tryNotifyAdmin(conv, "login");
+      }
+
+      convSnapshotRef.current.set(conv.email, { ping, unread });
+    }
+  }, [activeConversations, tryNotifyAdmin]);
 
   const handleCloseConversation = async () => {
     if (!selectedConversation) return;
@@ -229,22 +312,50 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
     setSelectedConversation(null);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (selectedFiles.length + files.length > 3) {
+      alert("Max 3 filer per meddelande");
+      return;
+    }
+    const tooLarge = files.filter((f) => f.size > 5 * 1024 * 1024);
+    if (tooLarge.length > 0) {
+      alert(`"${tooLarge[0].name}" är för stor (max 5MB)`);
+      return;
+    }
+    setSelectedFiles([...selectedFiles, ...files]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim() || !selectedConversation) return;
+    if (
+      (!replyText.trim() && selectedFiles.length === 0) ||
+      !selectedConversation
+    )
+      return;
 
     setIsSending(true);
+    setUploading(true);
     try {
+      const attachments =
+        selectedFiles.length > 0 ? await uploadFiles(selectedFiles) : [];
       await sendReply({
         toEmail: selectedConversation.email,
         toName: selectedConversation.name,
-        message: replyText,
+        message:
+          replyText.trim() ||
+          (attachments.length > 0 ? "📎 Skickade fil(er)" : ""),
+        attachments,
       });
       setReplyText("");
+      setSelectedFiles([]);
     } catch (error) {
       console.error("Failed to send reply:", error);
+      alert("Kunde inte skicka meddelandet.");
     } finally {
       setIsSending(false);
+      setUploading(false);
     }
   };
 
@@ -372,6 +483,8 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <NotificationEnableBanner className="mb-4" />
+
       {/* Header */}
       <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
         <div>
@@ -621,7 +734,26 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
                             {new Date(msg.createdAt).toLocaleTimeString()}
                           </span>
                         </div>
-                        <p className="text-sm wrap-break-word">{msg.message}</p>
+                        {msg.message && (
+                          <p className="text-sm wrap-break-word">{msg.message}</p>
+                        )}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {msg.attachments.map(
+                              (
+                                file: {
+                                  name: string;
+                                  storageId: Id<"_storage">;
+                                  size: number;
+                                  type: string;
+                                },
+                                idx: number,
+                              ) => (
+                                <Attachment key={idx} file={file} />
+                              ),
+                            )}
+                          </div>
+                        )}
                       </div>
                       {!msg.isFromAdmin && (
                         <button
@@ -636,6 +768,35 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {selectedFiles.length > 0 && (
+                  <div className="px-4 pt-2 flex flex-wrap gap-2 border-t border-slate-200 dark:border-slate-700">
+                    {selectedFiles.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-100 dark:bg-slate-700 rounded-lg p-2 text-xs flex items-center gap-2"
+                      >
+                        {file.type.startsWith("image/") ? (
+                          <FiImage className="w-4 h-4" />
+                        ) : (
+                          <FiFile className="w-4 h-4" />
+                        )}
+                        <span className="max-w-25 truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedFiles(
+                              selectedFiles.filter((_, i) => i !== idx),
+                            )
+                          }
+                          className="text-red-500"
+                        >
+                          <FiTrash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <form
                   onSubmit={handleSendReply}
                   className="p-4 border-t border-slate-200 dark:border-slate-700"
@@ -648,15 +809,36 @@ export default function AdminClient({ adminEmail }: AdminClientProps) {
                       placeholder="Skriv ditt svar..."
                       className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
                       autoFocus
+                      disabled={uploading}
                     />
+                    <label className="px-3 py-2 bg-slate-200 dark:bg-slate-600 rounded-lg cursor-pointer hover:bg-slate-300 dark:hover:bg-slate-500">
+                      <FiPaperclip className="w-4 h-4" />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*,video/mp4,application/pdf,.txt,.doc,.docx"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </label>
                     <button
                       type="submit"
-                      disabled={isSending || !replyText.trim()}
+                      disabled={
+                        isSending ||
+                        uploading ||
+                        (!replyText.trim() && selectedFiles.length === 0)
+                      }
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                     >
-                      <FiSend className="w-4 h-4" />
+                      {uploading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <FiSend className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
+                  <p className="text-xs text-slate-500 mt-2">📎 Max 3 filer, 5MB/fil</p>
                 </form>
               </>
             ) : (

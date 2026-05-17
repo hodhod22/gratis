@@ -29,22 +29,28 @@ export default defineSchema({
     isPublished: v.boolean(),
   }),
 
-  // messages tabell - KORREKT VERSION
- messages: defineTable({
-  name: v.string(),
-  email: v.string(),
-  message: v.string(),
-  attachments: v.optional(v.array(v.object({
+  // messages tabell med Convex Storage support
+  // messages tabell - attachments utan url (hämtas via getImageUrl)
+  messages: defineTable({
     name: v.string(),
-    url: v.string(),
-    size: v.number(),
-    type: v.string(),
-  }))),
-  isRead: v.boolean(),
-  isFromAdmin: v.boolean(),
-  createdAt: v.number(),
-}).index("by_email", ["email"])
-  .index("by_createdAt", ["createdAt"]),
+    email: v.string(),
+    message: v.string(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          storageId: v.id("_storage"),
+          size: v.number(),
+          type: v.string(),
+        }),
+      ),
+    ),
+    isRead: v.boolean(),
+    isFromAdmin: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_createdAt", ["createdAt"]),
 
   conversations: defineTable({
     email: v.string(),
@@ -53,6 +59,10 @@ export default defineSchema({
     lastMessageAt: v.number(),
     unreadCount: v.number(),
     adminClosedAt: v.optional(v.number()),
+    /** Senaste gången kunden var inloggad/chatt öppen (för admin-notis). */
+    lastCustomerPingAt: v.optional(v.number()),
+    /** Olästa meddelanden från admin (kundens vy). */
+    customerUnreadCount: v.optional(v.number()),
   })
     .index("by_email", ["email"])
     .index("by_isActive", ["isActive"])
@@ -91,4 +101,10 @@ export default defineSchema({
     lastSeen: v.number(),
     lastActive: v.number(),
   }),
+
+  rateLimits: defineTable({
+    key: v.string(),
+    count: v.number(),
+    windowStart: v.number(),
+  }).index("by_key", ["key"]),
 });

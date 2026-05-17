@@ -6,6 +6,8 @@ import TechStack from "@/components/TechStack";
 import ProjectCard from "@/components/ProjectCard";
 import CVButton from "@/components/CVButton";
 import Stats from "@/components/Stats";
+import WaitingTime from "@/components/WaitingTime";
+import SocialProof from "@/components/SocialProof";
 import { Doc } from "@/convex/_generated/dataModel";
 
 export const metadata = {
@@ -21,7 +23,13 @@ export default async function Home() {
     <>
       <Hero />
 
+      <section className="container mx-auto px-4 -mt-8 mb-8 max-w-3xl">
+        <WaitingTime />
+      </section>
+
       <Stats />
+
+      <SocialProof />
 
       <section className="text-center py-12 bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
         <div className="container mx-auto px-4">

@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server";
+import { fetchQuery } from "convex/nextjs";
+import { api } from "@/convex/_generated/api";
 
-let adminOnline = false;
-let lastSeen = Date.now();
-
-export async function POST(request: Request) {
+/** Proxy till Convex adminStatus (används av äldre klientkod). */
+export async function GET() {
   try {
-    const { isOnline } = await request.json();
-    adminOnline = isOnline;
-    lastSeen = Date.now();
-    console.log("Admin status updated:", isOnline ? "🟢 ONLINE" : "🔴 OFFLINE");
-    return NextResponse.json({ success: true });
+    const status = await fetchQuery(api.adminStatus.getAdminStatus, {});
+    return NextResponse.json({ isOnline: status.isOnline });
   } catch {
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    return NextResponse.json({ isOnline: false });
   }
 }
 
-export async function GET() {
-  const oneMinuteAgo = Date.now() - 60 * 1000; // 1 minut timeout
-  const isOnline = adminOnline && lastSeen > oneMinuteAgo;
-  return NextResponse.json({ isOnline });
+export async function POST() {
+  return NextResponse.json({ success: true });
 }
